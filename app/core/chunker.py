@@ -1,7 +1,24 @@
+import re
 from typing import List, Dict, Any, Union
 import os
 import pysrt
 from app.core.config import settings
+
+
+def clean_subtitle_text(text: str) -> str:
+    """
+    Cleans subtitle text by removing HTML formatting tags (e.g. <font color=...>, <i>, <b>),
+    ASS/SSA styling tags, and normalizing whitespace.
+    """
+    if not text:
+        return ""
+    # Strip HTML tags
+    cleaned = re.sub(r"<[^>]+>", "", text)
+    # Strip ASS formatting tags like {\an8}
+    cleaned = re.sub(r"\{[^}]+\}", "", cleaned)
+    # Normalize newlines and whitespace
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
 
 
 def chunk_subtitles(
@@ -60,9 +77,9 @@ def chunk_subtitles(
 
         if window_items:
             combined_text = " ".join(
-                item.text.replace("\n", " ").strip()
+                clean_subtitle_text(item.text)
                 for item in window_items
-                if item.text.strip()
+                if clean_subtitle_text(item.text)
             )
             if combined_text:
                 chunk_start_sec = window_items[0].start.ordinal / 1000.0
