@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "7c9e3f22-1d54-4a2b-9e32-a5e2f7b88931",
+    "name": "AI Sidecar",
+    "description": "Enables AI-powered semantic scene and dialogue search using the Jellyfin AI Sidecar service.",
+    "overview": "Indexes video subtitles and dialogue using vector embeddings for semantic scene search.",
+    "owner": "isaacdomini",
+    "category": "General",
+    "versions": [
+      {
+        "version": "0.0.1.0",
+        "changelog": "Release version 0.0.1.0",
+        "targetAbi": "10.8.0.0",
+        "sourceUrl": "https://github.com/isaacdomini/jellyfin-ai-sidecar/releases/download/plugin-v0.0.1/jellyfin-plugin-aisidecar-0.0.1.0.zip",
+        "checksum": "0246ba46261e7bb13c743f1c64d17258",
+        "timestamp": "2026-08-25T18:55:59Z"
+      }
+    ]
+  }
+]
