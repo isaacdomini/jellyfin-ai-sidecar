@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Jellyfin AI Sidecar Configuration</title>
+</head>
+<body>
+    <div id="aiSidecarConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="aiSidecarConfigForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">AI Sidecar (Semantic Search)</h2>
+                        <a is="emby-linkbutton" class="raised button-alt headerHelpButton emby-button" target="_blank" href="https://github.com">Help</a>
+                    </div>
+                    <p class="fieldDescription">
+                        Configure the connection to the Jellyfin AI Sidecar service for subtitle indexing and semantic scene search.
+                    </p>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SidecarServerUrl">Sidecar Server URL</label>
+                        <input is="emby-input" type="url" id="SidecarServerUrl" name="SidecarServerUrl" required />
+                        <div class="fieldDescription">URL of the running FastAPI AI Sidecar (e.g. <code>http://localhost:8000</code> or <code>http://ai-sidecar:8000</code>).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ApiKey">API Key (Optional)</label>
+                        <input is="emby-input" type="password" id="ApiKey" name="ApiKey" />
+                        <div class="fieldDescription">Optional secret key if authentication is enabled on the sidecar.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="AutoIndexOnAdd" name="AutoIndexOnAdd" />
+                            <span>Automatically index new media when added</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Automatically trigger subtitle extraction and vectorization when a movie or episode is scanned.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="IndexMovies" name="IndexMovies" />
+                            <span>Index Movies</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="IndexEpisodes" name="IndexEpisodes" />
+                            <span>Index TV Episodes</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="PreferredSubtitleLanguage">Preferred Subtitle Language</label>
+                        <input is="emby-input" type="text" id="PreferredSubtitleLanguage" name="PreferredSubtitleLanguage" value="eng" />
+                        <div class="fieldDescription">3-letter language code (e.g. <code>eng</code>, <code>spa</code>, <code>fre</code>) for subtitle extraction.</div>
+                    </div>
+
+                    <div style="margin-top: 2em; display: flex; gap: 1em;">
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save Settings</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnTestConnection" class="raised button-alt emby-button">
+                            <span>Test Connection</span>
+                        </button>
+                    </div>
+
+                    <div id="connectionStatus" style="margin-top: 1.5em; font-weight: bold;"></div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var pluginId = "7c9e3f22-1d54-4a2b-9e32-a5e2f7b88931";
+
+            document.querySelector('#aiSidecarConfigPage').addEventListener('pageshow', function () {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    document.querySelector('#SidecarServerUrl').value = config.SidecarServerUrl || "http://localhost:8000";
+                    document.querySelector('#ApiKey').value = config.ApiKey || "";
+                    document.querySelector('#AutoIndexOnAdd').checked = config.AutoIndexOnAdd !== false;
+                    document.querySelector('#IndexMovies').checked = config.IndexMovies !== false;
+                    document.querySelector('#IndexEpisodes').checked = config.IndexEpisodes !== false;
+                    document.querySelector('#PreferredSubtitleLanguage').value = config.PreferredSubtitleLanguage || "eng";
+                    Dashboard.hideLoadingMsg();
+                });
+            });
+
+            document.querySelector('#btnTestConnection').addEventListener('click', function () {
+                var statusEl = document.querySelector('#connectionStatus');
+                statusEl.textContent = "Testing connection to AI Sidecar...";
+                statusEl.style.color = "#aaa";
+
+                ApiClient.getJSON(ApiClient.getUrl('Plugins/AiSidecar/Status')).then(function (result) {
+                    statusEl.textContent = "✓ Successfully connected to AI Sidecar service!";
+                    statusEl.style.color = "#4CAF50";
+                }).catch(function (err) {
+                    statusEl.textContent = "✗ Connection failed: " + (err.message || "Unable to reach sidecar");
+                    statusEl.style.color = "#F44336";
+                });
+            });
+
+            document.querySelector('#aiSidecarConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                Dashboard.showLoadingMsg();
+
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    config.SidecarServerUrl = document.querySelector('#SidecarServerUrl').value;
+                    config.ApiKey = document.querySelector('#ApiKey').value;
+                    config.AutoIndexOnAdd = document.querySelector('#AutoIndexOnAdd').checked;
+                    config.IndexMovies = document.querySelector('#IndexMovies').checked;
+                    config.IndexEpisodes = document.querySelector('#IndexEpisodes').checked;
+                    config.PreferredSubtitleLanguage = document.querySelector('#PreferredSubtitleLanguage').value;
+
+                    ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    });
+                });
+                return false;
+            });
+        </script>
+    </div>
+</body>
+</html>

@@ -1,0 +1,163 @@
+from typing import List, Dict, Any, Optional
+import logging
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Float,
+    Text,
+    DateTime,
+    func,
+    text,
+    select
+)
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from pgvector.sqlalchemy import Vector
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+Base = declarative_base()
+
+
+class SubtitleChunk(Base):
+    """
+    SQLAlchemy model for subtitle chunks with a 768-dimensional pgvector column.
+    """
+    __tablename__ = "subtitle_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_id = Column(String(255), index=True, nullable=False)
+    item_name = Column(String(512), nullable=True)
+    chunk_text = Column(Text, nullable=False)
+    start_time = Column(Float, nullable=False)
+    end_time = Column(Float, nullable=False)
+    embedding = Column(Vector(768), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# Engine and Session factory using psycopg2
+engine = create_engine(
+    settings.get_database_url(),
+    echo=settings.DEBUG,
+    pool_pre_ping=True
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def init_db():
+    """
+    Initializes PostgreSQL database: creates vector extension and tables.
+    """
+    logger.info("Initializing database and pgvector extension...")
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        conn.commit()
+
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database schema initialized successfully.")
+
+
+def get_db():
+    """
+    Dependency generator for database sessions.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def insert_chunks(
+    item_id: str,
+    chunks: List[Dict[str, Any]],
+    embeddings: List[List[float]],
+    item_name: Optional[str] = None
+) -> int:
+    """
+    Inserts new subtitle chunks with pgvector embeddings into PostgreSQL.
+
+    :param item_id: Unique identifier for the media item
+    :param chunks: List of chunk dictionaries containing 'text', 'start_time', 'end_time'
+    :param embeddings: List of 768-dimensional float vectors matching each chunk
+    :param item_name: Optional display name for the media item
+    :return: Number of chunks inserted
+    """
+    if not chunks or not embeddings or len(chunks) != len(embeddings):
+        logger.warning(f"No chunks or embeddings to insert for item {item_id}, or length mismatch.")
+        return 0
+
+    session: Session = SessionLocal()
+    try:
+        # Remove any previous chunks for this media item when re-indexing
+        session.query(SubtitleChunk).filter(SubtitleChunk.item_id == item_id).delete()
+
+        records = [
+            SubtitleChunk(
+                item_id=item_id,
+                item_name=item_name,
+                chunk_text=chunk["text"],
+                start_time=float(chunk["start_time"]),
+                end_time=float(chunk["end_time"]),
+                embedding=embedding
+            )
+            for chunk, embedding in zip(chunks, embeddings)
+        ]
+
+        session.bulk_save_objects(records)
+        session.commit()
+        logger.info(f"Successfully inserted {len(records)} subtitle chunks for item '{item_id}'")
+        return len(records)
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error inserting chunks for item {item_id}: {e}", exc_info=True)
+        raise
+    finally:
+        session.close()
+
+
+def search_similar_chunks(
+    query_embedding: List[float],
+    top_k: int = 5,
+    item_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Searches for the most semantically similar subtitle chunks using pgvector cosine distance.
+
+    :param query_embedding: 768-dimensional query vector
+    :param top_k: Maximum number of results to return
+    :param item_id: Optional filter for a specific media item
+    :return: List of result dictionaries with similarity score and timestamp info
+    """
+    session: Session = SessionLocal()
+    try:
+        # Cosine distance ordering: lower distance = higher similarity
+        distance_expr = SubtitleChunk.embedding.cosine_distance(query_embedding).label("distance")
+        stmt = select(SubtitleChunk, distance_expr)
+
+        if item_id:
+            stmt = stmt.where(SubtitleChunk.item_id == item_id)
+
+        stmt = stmt.order_by(distance_expr.asc()).limit(top_k)
+        results = session.execute(stmt).all()
+
+        formatted_results = []
+        for chunk, distance in results:
+            similarity = 1.0 - float(distance) if distance is not None else 0.0
+            formatted_results.append({
+                "id": chunk.id,
+                "item_id": chunk.item_id,
+                "item_name": chunk.item_name,
+                "text": chunk.chunk_text,
+                "start_time": chunk.start_time,
+                "end_time": chunk.end_time,
+                "score": round(similarity, 4)
+            })
+
+        return formatted_results
+    finally:
+        session.close()
+
