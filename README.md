@@ -48,23 +48,30 @@ An intelligent Retrieval-Augmented Generation (RAG) backend service for **Jellyf
 
 ### Option 1: Docker Compose (Recommended)
 
-The easiest way to run the sidecar along with PostgreSQL and pgvector:
+The easiest way to run the sidecar along with PostgreSQL and pgvector using either the published GitHub Container Registry image or a local build:
 
 1. **Clone and navigate to repository**:
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/isaacdomini/jellyfin-ai-sidecar.git
    cd jellyfin-ai-sidecar
    ```
 
-2. **Configure Media Volume** in `docker-compose.yml`:
-   Ensure the `app` service can access your Jellyfin media path so it can read video/subtitle files:
-   ```yaml
-   volumes:
-     - ./app:/app/app
-     - /path/to/your/jellyfin/media:/media:ro  # Mount your media directory
+2. **Configure Environment Variables**:
+   Copy `.env.example` to `.env` and adjust your variables:
+   ```bash
+   cp .env.example .env
+   ```
+   Or set inline environment variables when running `docker compose`:
+   ```bash
+   MEDIA_PATH="/path/to/your/jellyfin/media" POSTGRES_PASSWORD="your_secure_password" docker compose up -d
    ```
 
 3. **Start the containers**:
+   Using the pre-built GHCR image:
+   ```bash
+   docker compose up -d
+   ```
+   Or building from source locally:
    ```bash
    docker compose up --build -d
    ```
@@ -197,6 +204,11 @@ The sidecar automatically detects and supports:
 
 | Environment Variable | Default | Description |
 |---|---|---|
+| `IMAGE_NAME` | `ghcr.io/isaacdomini/jellyfin-ai-sidecar` | Docker image registry name |
+| `IMAGE_TAG` | `latest` | Docker image tag |
+| `APP_PORT` | `8000` | Host port for FastAPI API |
+| `DB_PORT` | `5432` | Host port for PostgreSQL |
+| `MEDIA_PATH` | `./media` | Host media path mounted to `/media:ro` |
 | `DATABASE_URL` | `postgresql://...` | PostgreSQL connection URI |
 | `POSTGRES_USER` | `jellyfin_user` | Database user |
 | `POSTGRES_PASSWORD` | `jellyfin_pass` | Database password |
@@ -206,4 +218,7 @@ The sidecar automatically detects and supports:
 | `CHUNK_SIZE_SECONDS` | `30` | Sliding window chunk duration |
 | `CHUNK_OVERLAP_SECONDS` | `5` | Sliding window overlap duration |
 | `EMBEDDING_DIMENSION` | `768` | Vector embedding dimension size |
+| `JELLYFIN_SERVER_URL` | `""` | Jellyfin Server URL |
+| `JELLYFIN_API_KEY` | `""` | Jellyfin API Key |
+| `DEBUG` | `false` | Enable verbose debugging logs |
 | `FFMPEG_PATH` | `ffmpeg` | Path to FFmpeg executable |

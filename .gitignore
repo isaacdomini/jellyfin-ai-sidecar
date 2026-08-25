@@ -16,5 +16,5 @@ publish/
 *.user
 *.suo
 
-# Docker
-.dockerignore
+# OS
+.DS_Store

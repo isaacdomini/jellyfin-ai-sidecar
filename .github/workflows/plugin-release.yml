@@ -1,0 +1,120 @@
+name: Build and Release Jellyfin Plugin
+
+on:
+  push:
+    tags:
+      - 'plugin-v*'
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Plugin Version (e.g. 1.0.0.0)'
+        required: true
+        default: '1.0.0.0'
+
+jobs:
+  build-and-release:
+    name: Build Plugin and Deploy Manifest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '7.0.x'
+
+      - name: Determine Plugin Version
+        id: get_version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            RAW_TAG="${{ github.ref_name }}"
+            VERSION="${RAW_TAG#plugin-v}"
+            VERSION="${VERSION#v}"
+            # Ensure 4-part version number for Jellyfin ABI (e.g. 1.0.0.0)
+            DOT_COUNT=$(echo "$VERSION" | tr -cd '.' | wc -c)
+            if [ "$DOT_COUNT" -eq 2 ]; then
+              VERSION="${VERSION}.0"
+            elif [ "$DOT_COUNT" -eq 1 ]; then
+              VERSION="${VERSION}.0.0"
+            fi
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building plugin version $VERSION"
+
+      - name: Build and Publish Plugin DLL
+        run: |
+          cd plugins/Jellyfin.Plugin.AiSidecar
+          dotnet publish -c Release -p:Version=${{ steps.get_version.outputs.VERSION }} -o ./publish
+
+      - name: Package Plugin ZIP
+        id: package
+        run: |
+          ZIP_NAME="jellyfin-plugin-aisidecar-${{ steps.get_version.outputs.VERSION }}.zip"
+          cd plugins/Jellyfin.Plugin.AiSidecar/publish
+          zip -r "../../../$ZIP_NAME" ./*
+          cd ../../..
+          
+          # Calculate MD5 checksum
+          CHECKSUM=$(md5sum "$ZIP_NAME" | awk '{print $1}')
+          echo "CHECKSUM=$CHECKSUM" >> $GITHUB_OUTPUT
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_OUTPUT
+          echo "Generated $ZIP_NAME with MD5: $CHECKSUM"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.ZIP_NAME }}
+          tag_name: ${{ github.ref_name }}
+          name: Jellyfin AI Sidecar Plugin v${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Repository Manifest
+        run: |
+          mkdir -p gh-pages-dist
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          ZIP_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.package.outputs.ZIP_NAME }}"
+          
+          cat <<EOF > gh-pages-dist/manifest.json
+          [
+            {
+              "guid": "7c9e3f22-1d54-4a2b-9e32-a5e2f7b88931",
+              "name": "AI Sidecar",
+              "description": "Enables AI-powered semantic scene and dialogue search using the Jellyfin AI Sidecar service.",
+              "overview": "Indexes video subtitles and dialogue using vector embeddings for semantic scene search.",
+              "owner": "${{ github.repository_owner }}",
+              "category": "General",
+              "versions": [
+                {
+                  "version": "${{ steps.get_version.outputs.VERSION }}",
+                  "changelog": "Release version ${{ steps.get_version.outputs.VERSION }}",
+                  "targetAbi": "10.8.0.0",
+                  "sourceUrl": "$ZIP_URL",
+                  "checksum": "${{ steps.package.outputs.CHECKSUM }}",
+                  "timestamp": "$TIMESTAMP"
+                }
+              ]
+            }
+          ]
+          EOF
+          cat gh-pages-dist/manifest.json
+
+      - name: Deploy Manifest to GitHub Pages Branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages-dist
+          keep_files: false

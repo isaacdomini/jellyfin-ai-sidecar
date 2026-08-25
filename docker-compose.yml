@@ -2,26 +2,30 @@ version: '3.8'
 
 services:
   app:
+    image: ${IMAGE_NAME:-ghcr.io/isaacdomini/jellyfin-ai-sidecar}:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
     container_name: jellyfin-ai-sidecar
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
     environment:
-      - POSTGRES_USER=jellyfin_user
-      - POSTGRES_PASSWORD=jellyfin_pass
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=jellyfin_ai
-      - DATABASE_URL=postgresql://jellyfin_user:jellyfin_pass@db:5432/jellyfin_ai
-      - CHUNK_SIZE_SECONDS=30
-      - CHUNK_OVERLAP_SECONDS=5
-      - EMBEDDING_DIMENSION=768
+      - DEBUG=${DEBUG:-false}
+      - POSTGRES_USER=${POSTGRES_USER:-jellyfin_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jellyfin_pass}
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-jellyfin_ai}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-jellyfin_user}:${POSTGRES_PASSWORD:-jellyfin_pass}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-jellyfin_ai}}
+      - CHUNK_SIZE_SECONDS=${CHUNK_SIZE_SECONDS:-30}
+      - CHUNK_OVERLAP_SECONDS=${CHUNK_OVERLAP_SECONDS:-5}
+      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-768}
+      - JELLYFIN_SERVER_URL=${JELLYFIN_SERVER_URL:-}
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY:-}
+      - JELLYFIN_WEBHOOK_SECRET=${JELLYFIN_WEBHOOK_SECRET:-}
     volumes:
-      - ./app:/app/app
-      # Option to mount Jellyfin media folder if accessible to container
-      # - /path/to/jellyfin/media:/media:ro
+      # Optional: Mount media folder for direct subtitle extraction from disk
+      - ${MEDIA_PATH:-./media}:/media:ro
     depends_on:
       db:
         condition: service_healthy
@@ -31,15 +35,15 @@ services:
     image: pgvector/pgvector:pg16
     container_name: jellyfin-ai-db
     environment:
-      - POSTGRES_USER=jellyfin_user
-      - POSTGRES_PASSWORD=jellyfin_pass
-      - POSTGRES_DB=jellyfin_ai
+      - POSTGRES_USER=${POSTGRES_USER:-jellyfin_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jellyfin_pass}
+      - POSTGRES_DB=${POSTGRES_DB:-jellyfin_ai}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jellyfin_user -d jellyfin_ai"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jellyfin_user} -d ${POSTGRES_DB:-jellyfin_ai}"]
       interval: 5s
       timeout: 5s
       retries: 5
