@@ -24,8 +24,8 @@ PROVIDERS_INFO: Dict[str, Dict[str, Any]] = {
     },
     "gemini": {
         "name": "Google Gemini",
-        "default_model": "gemini-2.0-flash",
-        "available_models": ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+        "default_model": "gemini-3.7-flash",
+        "available_models": ["gemini-3.7-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
         "requires_api_key": True,
         "supports_base_url": False,
         "default_base_url": "https://generativelanguage.googleapis.com"
