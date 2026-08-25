@@ -67,6 +67,13 @@ async def get_stats():
     return get_library_stats()
 
 
+@app.post("/library/clear", tags=["Library Stats"])
+@app.delete("/library/clear", tags=["Library Stats"])
+async def clear_library():
+    from app.services.database import clear_database
+    return clear_database()
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

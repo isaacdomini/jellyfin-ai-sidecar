@@ -243,3 +243,25 @@ def get_library_stats() -> Dict[str, Any]:
         session.close()
 
 
+def clear_database() -> Dict[str, Any]:
+    """
+    Clears all indexed subtitle chunks and resets the database.
+    """
+    session: Session = SessionLocal()
+    try:
+        deleted_rows = session.query(SubtitleChunk).delete()
+        session.commit()
+        logger.info(f"Database cleared: removed {deleted_rows} chunks.")
+        return {
+            "status": "success",
+            "message": f"Successfully cleared {deleted_rows} subtitle chunks from database.",
+            "deleted_chunks": deleted_rows
+        }
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Error clearing database: {e}", exc_info=True)
+        raise
+    finally:
+        session.close()
+
+

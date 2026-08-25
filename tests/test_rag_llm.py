@@ -176,6 +176,12 @@ def test_fastapi_rag_endpoints():
             assert webhook_res.json()["status"] == "success"
             assert webhook_res.json()["item_id"] == "57509800-b569-cdfb-ee2e-f3bb6ae4a9ee"
 
+        # Test /library/clear endpoint
+        with patch("app.services.database.clear_database", return_value={"status": "success", "deleted_chunks": 10}):
+            clear_res = client.post("/library/clear")
+            assert clear_res.status_code == 200
+            assert clear_res.json()["deleted_chunks"] == 10
+
 
 @pytest.mark.asyncio
 async def test_openai_compatible_call():
