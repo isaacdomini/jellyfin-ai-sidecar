@@ -158,6 +158,24 @@ def test_fastapi_rag_endpoints():
             assert stats_res.status_code == 200
             assert stats_res.json()["total_items"] == 5
 
+        # Test /webhook/item-added endpoint
+        with patch("app.api.webhooks.process_media_item_background", new_callable=AsyncMock):
+            webhook_res = client.post("/webhook/item-added", json={
+                "Event": "LibrarySync",
+                "ItemId": "57509800-b569-cdfb-ee2e-f3bb6ae4a9ee",
+                "ItemName": "Cows and Raccoons",
+                "ItemPath": "/data/ext_media/series/Animal Control/Season 01/S01E05.mp4",
+                "Item": {
+                    "Id": "57509800-b569-cdfb-ee2e-f3bb6ae4a9ee",
+                    "Name": "Cows and Raccoons",
+                    "Path": "/data/ext_media/series/Animal Control/Season 01/S01E05.mp4",
+                    "Overview": "Frank gets caught in a dilemma."
+                }
+            })
+            assert webhook_res.status_code == 200
+            assert webhook_res.json()["status"] == "success"
+            assert webhook_res.json()["item_id"] == "57509800-b569-cdfb-ee2e-f3bb6ae4a9ee"
+
 
 @pytest.mark.asyncio
 async def test_openai_compatible_call():

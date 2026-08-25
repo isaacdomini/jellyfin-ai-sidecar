@@ -109,6 +109,7 @@ async def item_event_webhook(
     item_id = payload.get_item_id() or "unknown_item"
     item_name = payload.get_item_name() or "Untitled Media"
     file_path = payload.get_file_path()
+    overview = payload.get_overview()
     event_name = payload.Event or payload.NotificationType or "ItemEvent"
     logger.info(f"Received webhook for media item: event='{event_name}', id='{item_id}', name='{item_name}', path='{file_path}'")
 
