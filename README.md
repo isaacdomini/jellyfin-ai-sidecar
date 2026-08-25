@@ -256,30 +256,28 @@ Ask complex natural language questions about scenes, plot lines, or quotes. The 
 
 ## ⚙️ Configuration Reference
 
-| Environment Variable | Default | Description |
-|---|---|---|
-| `IMAGE_NAME` | `ghcr.io/isaacdomini/jellyfin-ai-sidecar` | Docker image registry name |
-| `IMAGE_TAG` | `latest` | Docker image tag |
-| `APP_PORT` | `8000` | Host port for FastAPI API |
-| `DB_PORT` | `5432` | Host port for PostgreSQL |
-| `MEDIA_PATH` | `./media` | Host media path mounted to `/media:ro` |
-| `DATABASE_URL` | `postgresql://...` | PostgreSQL connection URI |
-| `POSTGRES_USER` | `jellyfin_user` | Database user |
-| `POSTGRES_PASSWORD` | `jellyfin_pass` | Database password |
-| `POSTGRES_HOST` | `db` | Database host |
-| `POSTGRES_PORT` | `5432` | Database port |
-| `POSTGRES_DB` | `jellyfin_ai` | Database name |
-| `CHUNK_SIZE_SECONDS` | `30` | Sliding window chunk duration |
-| `CHUNK_OVERLAP_SECONDS` | `5` | Sliding window overlap duration |
-| `EMBEDDING_DIMENSION` | `768` | Vector embedding dimension size |
-| `LLM_PROVIDER` | `openai` | Default LLM provider (`openai`, `gemini`, `anthropic`, `groq`, `ollama`, `custom`) |
-| `LLM_API_KEY` | `""` | Default API key for LLM provider |
-| `LLM_MODEL` | `""` | Default LLM model override |
-| `LLM_BASE_URL` | `""` | Custom LLM base URL endpoint |
-| `LLM_TEMPERATURE` | `0.2` | Default sampling temperature |
-| `RAG_TOP_K` | `5` | Default number of vector DB chunks for RAG |
-| `JELLYFIN_SERVER_URL` | `""` | Jellyfin Server URL |
-| `JELLYFIN_API_KEY` | `""` | Jellyfin API Key |
-| `DEBUG` | `false` | Enable verbose debugging logs |
-| `FFMPEG_PATH` | `ffmpeg` | Path to FFmpeg executable |
+All environment variables use the `AI_SIDECAR_` prefix so they can be safely added to shared `.env` files across multi-service Docker setups:
+
+| Scoped Variable | Fallback Variable | Default | Description |
+|---|---|---|---|
+| `AI_SIDECAR_IMAGE_TAG` | `IMAGE_TAG` | `latest` | Docker image tag |
+| `AI_SIDECAR_PORT` | `APP_PORT` | `8000` | Host port for FastAPI API |
+| `AI_SIDECAR_DB_PORT` | `DB_PORT` | `5432` | Host port for PostgreSQL |
+| `AI_SIDECAR_MEDIA_PATH` | `MEDIA_PATH` | `./media` | Host media path mounted to `/data/ext_media:ro` |
+| `AI_SIDECAR_DB_USER` | `POSTGRES_USER` | `jellyfin_user` | Database user |
+| `AI_SIDECAR_DB_PASSWORD` | `POSTGRES_PASSWORD` | `jellyfin_pass` | Database password |
+| `AI_SIDECAR_DB_HOST` | `POSTGRES_HOST` | `db` | Database host |
+| `AI_SIDECAR_DB_NAME` | `POSTGRES_DB` | `jellyfin_ai` | Database name |
+| `AI_SIDECAR_CHUNK_SIZE_SECONDS` | `CHUNK_SIZE_SECONDS` | `30` | Sliding window chunk duration (seconds) |
+| `AI_SIDECAR_CHUNK_OVERLAP_SECONDS` | `CHUNK_OVERLAP_SECONDS` | `5` | Sliding window overlap duration (seconds) |
+| `AI_SIDECAR_EMBEDDING_DIMENSION` | `EMBEDDING_DIMENSION` | `768` | Vector embedding dimension size |
+| `AI_SIDECAR_LLM_PROVIDER` | `LLM_PROVIDER` | `openai` | LLM provider (`openai`, `gemini`, `anthropic`, `groq`, `ollama`, `custom`) |
+| `AI_SIDECAR_LLM_API_KEY` | `LLM_API_KEY` | `""` | API key for selected LLM provider |
+| `AI_SIDECAR_LLM_MODEL` | `LLM_MODEL` | `gpt-4o-mini` | LLM model override |
+| `AI_SIDECAR_LLM_BASE_URL` | `LLM_BASE_URL` | `""` | Custom LLM base URL endpoint |
+| `AI_SIDECAR_LLM_TEMPERATURE` | `LLM_TEMPERATURE` | `0.2` | Sampling temperature |
+| `AI_SIDECAR_RAG_TOP_K` | `RAG_TOP_K` | `5` | Number of context chunks for RAG |
+| `AI_SIDECAR_JELLYFIN_SERVER_URL` | `JELLYFIN_SERVER_URL` | `""` | Jellyfin Server URL (for deep-links) |
+| `AI_SIDECAR_DEBUG` | `DEBUG` | `false` | Enable verbose debugging logs |
+
 

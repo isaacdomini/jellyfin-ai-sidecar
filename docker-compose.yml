@@ -2,30 +2,36 @@ version: '3.8'
 
 services:
   app:
-    image: ${IMAGE_NAME:-ghcr.io/isaacdomini/jellyfin-ai-sidecar}:${IMAGE_TAG:-latest}
+    image: ${AI_SIDECAR_IMAGE_NAME:-ghcr.io/isaacdomini/jellyfin-ai-sidecar}:${AI_SIDECAR_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
     container_name: jellyfin-ai-sidecar
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "${AI_SIDECAR_PORT:-8000}:8000"
     environment:
-      - DEBUG=${DEBUG:-false}
-      - POSTGRES_USER=${POSTGRES_USER:-jellyfin_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jellyfin_pass}
-      - POSTGRES_HOST=${POSTGRES_HOST:-db}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - POSTGRES_DB=${POSTGRES_DB:-jellyfin_ai}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-jellyfin_user}:${POSTGRES_PASSWORD:-jellyfin_pass}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-jellyfin_ai}}
-      - CHUNK_SIZE_SECONDS=${CHUNK_SIZE_SECONDS:-30}
-      - CHUNK_OVERLAP_SECONDS=${CHUNK_OVERLAP_SECONDS:-5}
-      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-768}
-      - JELLYFIN_SERVER_URL=${JELLYFIN_SERVER_URL:-}
-      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY:-}
-      - JELLYFIN_WEBHOOK_SECRET=${JELLYFIN_WEBHOOK_SECRET:-}
+      - AI_SIDECAR_DEBUG=${AI_SIDECAR_DEBUG:-false}
+      - AI_SIDECAR_DB_USER=${AI_SIDECAR_DB_USER:-jellyfin_user}
+      - AI_SIDECAR_DB_PASSWORD=${AI_SIDECAR_DB_PASSWORD:-jellyfin_pass}
+      - AI_SIDECAR_DB_HOST=${AI_SIDECAR_DB_HOST:-db}
+      - AI_SIDECAR_DB_PORT=${AI_SIDECAR_DB_PORT:-5432}
+      - AI_SIDECAR_DB_NAME=${AI_SIDECAR_DB_NAME:-jellyfin_ai}
+      - AI_SIDECAR_CHUNK_SIZE_SECONDS=${AI_SIDECAR_CHUNK_SIZE_SECONDS:-30}
+      - AI_SIDECAR_CHUNK_OVERLAP_SECONDS=${AI_SIDECAR_CHUNK_OVERLAP_SECONDS:-5}
+      - AI_SIDECAR_EMBEDDING_DIMENSION=${AI_SIDECAR_EMBEDDING_DIMENSION:-768}
+      - AI_SIDECAR_LLM_PROVIDER=${AI_SIDECAR_LLM_PROVIDER:-openai}
+      - AI_SIDECAR_LLM_API_KEY=${AI_SIDECAR_LLM_API_KEY:-}
+      - AI_SIDECAR_LLM_MODEL=${AI_SIDECAR_LLM_MODEL:-gpt-4o-mini}
+      - AI_SIDECAR_LLM_BASE_URL=${AI_SIDECAR_LLM_BASE_URL:-}
+      - AI_SIDECAR_LLM_TEMPERATURE=${AI_SIDECAR_LLM_TEMPERATURE:-0.2}
+      - AI_SIDECAR_RAG_TOP_K=${AI_SIDECAR_RAG_TOP_K:-5}
+      - AI_SIDECAR_JELLYFIN_SERVER_URL=${AI_SIDECAR_JELLYFIN_SERVER_URL:-http://jellyfin:8096}
+      - AI_SIDECAR_JELLYFIN_API_KEY=${AI_SIDECAR_JELLYFIN_API_KEY:-}
+      - AI_SIDECAR_JELLYFIN_WEBHOOK_SECRET=${AI_SIDECAR_JELLYFIN_WEBHOOK_SECRET:-}
     volumes:
-      # Optional: Mount media folder for direct subtitle extraction from disk
-      - ${MEDIA_PATH:-./media}:/media:ro
+      # Mount media folder for direct subtitle extraction from disk
+      - ${AI_SIDECAR_MEDIA_PATH:-./media}:/media:ro
+      - ${AI_SIDECAR_MEDIA_PATH:-./media}:/data/ext_media:ro
     depends_on:
       db:
         condition: service_healthy
@@ -35,15 +41,15 @@ services:
     image: pgvector/pgvector:pg16
     container_name: jellyfin-ai-db
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-jellyfin_user}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jellyfin_pass}
-      - POSTGRES_DB=${POSTGRES_DB:-jellyfin_ai}
+      - POSTGRES_USER=${AI_SIDECAR_DB_USER:-jellyfin_user}
+      - POSTGRES_PASSWORD=${AI_SIDECAR_DB_PASSWORD:-jellyfin_pass}
+      - POSTGRES_DB=${AI_SIDECAR_DB_NAME:-jellyfin_ai}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${AI_SIDECAR_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jellyfin_user} -d ${POSTGRES_DB:-jellyfin_ai}"]
+      test: ["CMD-SHELL", "pg_isready -U ${AI_SIDECAR_DB_USER:-jellyfin_user} -d ${AI_SIDECAR_DB_NAME:-jellyfin_ai}"]
       interval: 5s
       timeout: 5s
       retries: 5
