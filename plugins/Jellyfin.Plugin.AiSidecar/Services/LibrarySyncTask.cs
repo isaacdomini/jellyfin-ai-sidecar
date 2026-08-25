@@ -50,7 +50,7 @@ public class LibrarySyncTask : IScheduledTask
         {
             new TaskTriggerInfo
             {
-                Type = TaskTriggerInfo.TriggerWeekly,
+                Type = TaskTriggerInfoType.WeeklyTrigger,
                 DayOfWeek = DayOfWeek.Sunday,
                 TimeOfDayTicks = TimeSpan.FromHours(3).Ticks
             }
