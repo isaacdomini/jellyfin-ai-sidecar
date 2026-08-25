@@ -1,69 +1,135 @@
-<div id="AiSidecarConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+<div id="AiSidecarConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox,emby-select">
     <div data-role="content">
         <div class="content-primary">
             <form id="aiSidecarConfigForm">
                 <div class="sectionTitleContainer flex align-items-center">
-                    <h2 class="sectionTitle">AI Sidecar (Semantic Search)</h2>
+                    <h2 class="sectionTitle">🍿 AI Sidecar & LLM RAG Settings</h2>
                     <a is="emby-linkbutton" class="raised button-alt headerHelpButton emby-button" target="_blank" href="https://github.com/isaacdomini/jellyfin-ai-sidecar">Help</a>
                 </div>
                 <p class="fieldDescription">
-                    Configure the connection to the Jellyfin AI Sidecar service for subtitle indexing and semantic scene search.
+                    Configure the Jellyfin AI Sidecar service for subtitle vector indexing, RAG scene search, and LLM answering with exact timestamp playback deep-links.
                 </p>
 
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="SidecarServerUrl">Sidecar Server URL</label>
-                    <input is="emby-input" type="url" id="SidecarServerUrl" name="SidecarServerUrl" required />
-                    <div class="fieldDescription">URL of the running FastAPI AI Sidecar (e.g. <code>http://localhost:8000</code> or <code>http://ai-sidecar:8000</code>).</div>
+                <!-- Section 1: Sidecar Connection -->
+                <div class="verticalSection">
+                    <h3 class="sectionTitle">1. Sidecar Backend Connection</h3>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="SidecarServerUrl">Sidecar Server URL</label>
+                        <input is="emby-input" type="url" id="SidecarServerUrl" name="SidecarServerUrl" required />
+                        <div class="fieldDescription">URL of the running FastAPI AI Sidecar (e.g. <code>http://localhost:8000</code> or <code>http://ai-sidecar:8000</code>).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ApiKey">Sidecar Secret / API Key (Optional)</label>
+                        <input is="emby-input" type="password" id="ApiKey" name="ApiKey" />
+                        <div class="fieldDescription">Optional authentication token if enabled on the sidecar backend.</div>
+                    </div>
                 </div>
 
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="ApiKey">API Key (Optional)</label>
-                    <input is="emby-input" type="password" id="ApiKey" name="ApiKey" />
-                    <div class="fieldDescription">Optional secret key if authentication is enabled on the sidecar.</div>
+                <!-- Section 2: LLM & RAG Provider Settings -->
+                <div class="verticalSection" style="margin-top: 2em; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <h3 class="sectionTitle">2. LLM & RAG Configuration</h3>
+                    <p class="fieldDescription">Choose your preferred LLM provider for answering natural language queries and citing exact movie timestamps.</p>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="LlmProvider">LLM Provider</label>
+                        <select is="emby-select" id="LlmProvider" name="LlmProvider" class="emby-select-withcolor emby-select">
+                            <option value="OpenAI">OpenAI (ChatGPT / GPT-4o)</option>
+                            <option value="Gemini">Google Gemini (Gemini 2.0 / 1.5)</option>
+                            <option value="Anthropic">Anthropic Claude (Claude 3.5 Sonnet / Haiku)</option>
+                            <option value="Groq">Groq (Ultra-fast Llama 3.3 / Mixtral)</option>
+                            <option value="Ollama">Ollama (Local LLM)</option>
+                            <option value="Custom">Custom / OpenAI-Compatible (OpenRouter, vLLM, DeepSeek)</option>
+                        </select>
+                        <div class="fieldDescription">Select the AI model provider.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="LlmApiKey">LLM API Key</label>
+                        <div style="display: flex; gap: 0.5em;">
+                            <input is="emby-input" type="password" id="LlmApiKey" name="LlmApiKey" style="flex: 1;" placeholder="sk-... or AIzaSy..." />
+                            <button is="emby-button" type="button" id="btnToggleApiKey" class="raised button-alt emby-button" style="padding: 0 1em;">👁️ Show</button>
+                        </div>
+                        <div class="fieldDescription" id="apiKeyHint">API key for the selected provider (leave blank for Ollama).</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="LlmModel">Model Name</label>
+                        <input is="emby-input" type="text" id="LlmModel" name="LlmModel" value="gpt-4o-mini" required />
+                        <div class="fieldDescription" id="modelPresetsHint">
+                            Suggested models: <span id="modelBadges" style="cursor: pointer; color: #2196F3;"></span>
+                        </div>
+                    </div>
+
+                    <div class="inputContainer" id="baseUrlContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="LlmBaseUrl">Custom API Base URL (Optional)</label>
+                        <input is="emby-input" type="url" id="LlmBaseUrl" name="LlmBaseUrl" placeholder="http://localhost:11434/v1 or https://openrouter.ai/api/v1" />
+                        <div class="fieldDescription">Custom endpoint URL (default for Ollama: <code>http://localhost:11434/v1</code>).</div>
+                    </div>
+
+                    <div style="display: flex; gap: 1.5em; flex-wrap: wrap;">
+                        <div class="inputContainer" style="flex: 1; min-width: 200px;">
+                            <label class="inputLabel inputLabelUnfocused" for="LlmTopK">Max Context Chunks (Top-K)</label>
+                            <input is="emby-input" type="number" id="LlmTopK" name="LlmTopK" min="1" max="25" value="5" />
+                            <div class="fieldDescription">Number of dialogue chunks retrieved from vector DB.</div>
+                        </div>
+
+                        <div class="inputContainer" style="flex: 1; min-width: 200px;">
+                            <label class="inputLabel inputLabelUnfocused" for="LlmTemperature">Sampling Temperature</label>
+                            <input is="emby-input" type="number" id="LlmTemperature" name="LlmTemperature" min="0" max="1" step="0.1" value="0.2" />
+                            <div class="fieldDescription">Lower (0.0-0.3) for factual citations, higher for creativity.</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="checkboxContainer checkboxContainer-withDescription">
-                    <label>
-                        <input is="emby-checkbox" type="checkbox" id="AutoIndexOnAdd" name="AutoIndexOnAdd" />
-                        <span>Automatically index new media when added</span>
-                    </label>
-                    <div class="fieldDescription checkboxFieldDescription">Automatically trigger subtitle extraction and vectorization when a new movie or episode is scanned.</div>
+                <!-- Section 3: Indexing Options -->
+                <div class="verticalSection" style="margin-top: 2em; padding-top: 1.5em; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <h3 class="sectionTitle">3. Automatic Library Indexing</h3>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="AutoIndexOnAdd" name="AutoIndexOnAdd" />
+                            <span>Automatically index new media when added</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Automatically trigger subtitle extraction and vectorization when a new movie or episode is scanned.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="AutoIndexOnUpdate" name="AutoIndexOnUpdate" />
+                            <span>Automatically re-index when media is updated (e.g. new subtitles added)</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Automatically re-extract and vectorize when subtitle files are added or metadata is refreshed.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="IndexMovies" name="IndexMovies" />
+                            <span>Index Movies</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="IndexEpisodes" name="IndexEpisodes" />
+                            <span>Index TV Episodes</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="PreferredSubtitleLanguage">Preferred Subtitle Language</label>
+                        <input is="emby-input" type="text" id="PreferredSubtitleLanguage" name="PreferredSubtitleLanguage" value="eng" />
+                        <div class="fieldDescription">3-letter language code (e.g. <code>eng</code>, <code>spa</code>, <code>fre</code>) for subtitle extraction.</div>
+                    </div>
                 </div>
 
-                <div class="checkboxContainer checkboxContainer-withDescription">
-                    <label>
-                        <input is="emby-checkbox" type="checkbox" id="AutoIndexOnUpdate" name="AutoIndexOnUpdate" />
-                        <span>Automatically re-index when media is updated (e.g. new subtitles added)</span>
-                    </label>
-                    <div class="fieldDescription checkboxFieldDescription">Automatically re-extract and vectorize when subtitle files are added or metadata is refreshed.</div>
-                </div>
-
-                <div class="checkboxContainer checkboxContainer-withDescription">
-                    <label>
-                        <input is="emby-checkbox" type="checkbox" id="IndexMovies" name="IndexMovies" />
-                        <span>Index Movies</span>
-                    </label>
-                </div>
-
-                <div class="checkboxContainer checkboxContainer-withDescription">
-                    <label>
-                        <input is="emby-checkbox" type="checkbox" id="IndexEpisodes" name="IndexEpisodes" />
-                        <span>Index TV Episodes</span>
-                    </label>
-                </div>
-
-                <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="PreferredSubtitleLanguage">Preferred Subtitle Language</label>
-                    <input is="emby-input" type="text" id="PreferredSubtitleLanguage" name="PreferredSubtitleLanguage" value="eng" />
-                    <div class="fieldDescription">3-letter language code (e.g. <code>eng</code>, <code>spa</code>, <code>fre</code>) for subtitle extraction.</div>
-                </div>
-
+                <!-- Action Buttons -->
                 <div style="margin-top: 2em; display: flex; flex-wrap: wrap; gap: 1em;">
                     <button is="emby-button" type="submit" class="raised button-submit block emby-button">
-                        <span>Save Settings</span>
+                        <span>💾 Save Settings</span>
                     </button>
                     <button is="emby-button" type="button" id="btnTestConnection" class="raised button-alt emby-button">
-                        <span>Test Connection</span>
+                        <span>🔌 Test Connection</span>
                     </button>
                     <button is="emby-button" type="button" id="btnSyncLibrary" class="raised button-alt emby-button" style="background-color: #2196F3; color: white;">
                         <span>⚡ Index Entire Library Now</span>
@@ -72,11 +138,113 @@
 
                 <div id="connectionStatus" style="margin-top: 1.5em; font-weight: bold;"></div>
             </form>
+
+            <!-- Section 4: Interactive Ask AI & Timestamp Deep-Link Player Console -->
+            <div class="verticalSection" style="margin-top: 3em; padding: 1.5em; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(33, 150, 243, 0.4);">
+                <h3 class="sectionTitle" style="color: #64B5F6; margin-top: 0;">✨ Interactive RAG Query & Deep-Link Player Test</h3>
+                <p class="fieldDescription">
+                    Ask any question about your media. The LLM answers using dialogue indexed in the vector DB and provides 1-click deep-link buttons to jump straight to that moment in the video player!
+                </p>
+
+                <div class="inputContainer" style="margin-top: 1em;">
+                    <label class="inputLabel inputLabelUnfocused" for="testQueryInput">Your Question / Scene Search</label>
+                    <div style="display: flex; gap: 0.5em;">
+                        <input is="emby-input" type="text" id="testQueryInput" placeholder="e.g. What was the final puzzle the villain left? or Where is the secret key hidden?" style="flex: 1;" />
+                        <button is="emby-button" type="button" id="btnAskAi" class="raised emby-button" style="background-color: #4CAF50; color: white; min-width: 120px;">
+                            <span>💬 Ask AI</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 0.5em; font-size: 0.9em; color: #aaa;">
+                    Quick Prompts:
+                    <a href="#" class="sample-prompt" style="color: #64B5F6; margin-right: 1em;">"What was the final puzzle the villain left?"</a>
+                    <a href="#" class="sample-prompt" style="color: #64B5F6; margin-right: 1em;">"What did the detective say before leaving?"</a>
+                    <a href="#" class="sample-prompt" style="color: #64B5F6;">"Who discovered the secret map?"</a>
+                </div>
+
+                <!-- Response Display Box -->
+                <div id="ragResultContainer" style="display: none; margin-top: 1.5em; padding: 1.2em; background: rgba(255,255,255,0.05); border-radius: 6px; border-left: 4px solid #64B5F6;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8em;">
+                        <h4 style="margin: 0; color: #64B5F6; font-size: 1.1em;">🤖 AI Answer</h4>
+                        <span id="ragMetaBadge" style="font-size: 0.8em; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 12px; color: #bbb;"></span>
+                    </div>
+                    <div id="ragAnswerText" style="white-space: pre-wrap; line-height: 1.6; font-size: 1em; margin-bottom: 1.2em;"></div>
+
+                    <h4 style="margin: 1em 0 0.5em 0; color: #FFC107; font-size: 1em;">🎬 Cited Scenes & Playback Deep-Links</h4>
+                    <div id="ragCitationsList" style="display: flex; flex-direction: column; gap: 0.8em;"></div>
+                </div>
+
+                <div id="ragLoadingStatus" style="display: none; margin-top: 1em; color: #64B5F6; font-style: italic;">
+                    🔍 Searching vector database & asking LLM... please wait...
+                </div>
+            </div>
         </div>
     </div>
 
     <script type="text/javascript">
         var pluginId = "7c9e3f22-1d54-4a2b-9e32-a5e2f7b88931";
+
+        var providerPresets = {
+            "OpenAI": {
+                defaultModel: "gpt-4o-mini",
+                models: ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", "o3-mini"],
+                baseUrl: "",
+                hint: "Requires OpenAI API key (sk-...)"
+            },
+            "Gemini": {
+                defaultModel: "gemini-2.0-flash",
+                models: ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+                baseUrl: "",
+                hint: "Requires Google Gemini API key (AIzaSy...)"
+            },
+            "Anthropic": {
+                defaultModel: "claude-3-5-haiku-20241022",
+                models: ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-opus-20240229"],
+                baseUrl: "",
+                hint: "Requires Anthropic Claude API key (sk-ant-...)"
+            },
+            "Groq": {
+                defaultModel: "llama-3.3-70b-versatile",
+                models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
+                baseUrl: "https://api.groq.com/openai/v1",
+                hint: "Requires Groq API key (gsk_...)"
+            },
+            "Ollama": {
+                defaultModel: "llama3.2",
+                models: ["llama3.2", "mistral", "deepseek-r1", "qwen2.5"],
+                baseUrl: "http://localhost:11434/v1",
+                hint: "No API key required for local Ollama instances"
+            },
+            "Custom": {
+                defaultModel: "custom-model",
+                models: ["custom-model", "deepseek-chat", "mistral-large"],
+                baseUrl: "https://openrouter.ai/api/v1",
+                hint: "OpenAI-compatible endpoints (OpenRouter, vLLM, DeepSeek, LocalAI)"
+            }
+        };
+
+        function updateModelBadges(provider) {
+            var preset = providerPresets[provider] || providerPresets["OpenAI"];
+            var badgesContainer = document.querySelector('#modelBadges');
+            var hintEl = document.querySelector('#apiKeyHint');
+            if (hintEl) hintEl.textContent = preset.hint;
+
+            if (badgesContainer) {
+                badgesContainer.innerHTML = '';
+                preset.models.forEach(function (m) {
+                    var badge = document.createElement('span');
+                    badge.textContent = '[' + m + '] ';
+                    badge.style.marginRight = '6px';
+                    badge.style.cursor = 'pointer';
+                    badge.title = 'Click to use ' + m;
+                    badge.addEventListener('click', function () {
+                        document.querySelector('#LlmModel').value = m;
+                    });
+                    badgesContainer.appendChild(badge);
+                });
+            }
+        }
 
         function loadPluginConfig(view) {
             Dashboard.showLoadingMsg();
@@ -88,6 +256,17 @@
                 view.querySelector('#IndexMovies').checked = config.IndexMovies !== false;
                 view.querySelector('#IndexEpisodes').checked = config.IndexEpisodes !== false;
                 view.querySelector('#PreferredSubtitleLanguage').value = config.PreferredSubtitleLanguage || "eng";
+
+                // LLM Settings
+                var prov = config.LlmProvider || "OpenAI";
+                view.querySelector('#LlmProvider').value = prov;
+                view.querySelector('#LlmApiKey').value = config.LlmApiKey || "";
+                view.querySelector('#LlmModel').value = config.LlmModel || providerPresets[prov]?.defaultModel || "gpt-4o-mini";
+                view.querySelector('#LlmBaseUrl').value = config.LlmBaseUrl || "";
+                view.querySelector('#LlmTopK').value = config.LlmTopK || 5;
+                view.querySelector('#LlmTemperature').value = config.LlmTemperature !== undefined ? config.LlmTemperature : 0.2;
+
+                updateModelBadges(prov);
                 Dashboard.hideLoadingMsg();
             }).catch(function () {
                 Dashboard.hideLoadingMsg();
@@ -101,6 +280,147 @@
             });
             pageEl.addEventListener('viewshow', function () {
                 loadPluginConfig(this);
+            });
+
+            // Provider change listener
+            pageEl.querySelector('#LlmProvider').addEventListener('change', function () {
+                var selected = this.value;
+                var preset = providerPresets[selected];
+                if (preset) {
+                    var modelInput = pageEl.querySelector('#LlmModel');
+                    var baseUrlInput = pageEl.querySelector('#LlmBaseUrl');
+                    if (preset.defaultModel) modelInput.value = preset.defaultModel;
+                    if (preset.baseUrl && !baseUrlInput.value) baseUrlInput.value = preset.baseUrl;
+                    updateModelBadges(selected);
+                }
+            });
+
+            // Show/hide API key
+            pageEl.querySelector('#btnToggleApiKey').addEventListener('click', function () {
+                var keyInput = pageEl.querySelector('#LlmApiKey');
+                if (keyInput.type === 'password') {
+                    keyInput.type = 'text';
+                    this.textContent = '🔒 Hide';
+                } else {
+                    keyInput.type = 'password';
+                    this.textContent = '👁️ Show';
+                }
+            });
+
+            // Sample prompt clicks
+            pageEl.querySelectorAll('.sample-prompt').forEach(function (link) {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    pageEl.querySelector('#testQueryInput').value = this.textContent.replace(/^"|"$/g, '');
+                    pageEl.querySelector('#btnAskAi').click();
+                });
+            });
+
+            // Ask AI button
+            pageEl.querySelector('#btnAskAi').addEventListener('click', function () {
+                var query = pageEl.querySelector('#testQueryInput').value.trim();
+                if (!query) {
+                    alert('Please enter a query or question to ask the AI.');
+                    return;
+                }
+
+                var statusEl = pageEl.querySelector('#ragLoadingStatus');
+                var resultBox = pageEl.querySelector('#ragResultContainer');
+                var answerEl = pageEl.querySelector('#ragAnswerText');
+                var metaBadge = pageEl.querySelector('#ragMetaBadge');
+                var citationsList = pageEl.querySelector('#ragCitationsList');
+
+                statusEl.style.display = 'block';
+                resultBox.style.display = 'none';
+                citationsList.innerHTML = '';
+
+                var payload = {
+                    Query: query,
+                    Provider: pageEl.querySelector('#LlmProvider').value,
+                    ApiKey: pageEl.querySelector('#LlmApiKey').value,
+                    Model: pageEl.querySelector('#LlmModel').value,
+                    BaseUrl: pageEl.querySelector('#LlmBaseUrl').value,
+                    TopK: parseInt(pageEl.querySelector('#LlmTopK').value, 10) || 5,
+                    Temperature: parseFloat(pageEl.querySelector('#LlmTemperature').value) || 0.2
+                };
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('Plugins/AiSidecar/Ask'),
+                    type: 'POST',
+                    data: JSON.stringify(payload),
+                    contentType: 'application/json'
+                }).then(function (res) {
+                    return res.json();
+                }).then(function (data) {
+                    statusEl.style.display = 'none';
+                    resultBox.style.display = 'block';
+
+                    answerEl.textContent = data.answer || "No response received.";
+                    metaBadge.textContent = (data.provider_used || "AI") + " • " + (data.model_used || "");
+
+                    citationsList.innerHTML = '';
+                    if (data.citations && data.citations.length > 0) {
+                        data.citations.forEach(function (cit, idx) {
+                            var itemCard = document.createElement('div');
+                            itemCard.style.padding = '10px 14px';
+                            itemCard.style.background = 'rgba(255,255,255,0.08)';
+                            itemCard.style.borderRadius = '6px';
+                            itemCard.style.display = 'flex';
+                            itemCard.style.justifyContent = 'space-between';
+                            itemCard.style.alignItems = 'center';
+                            itemCard.style.gap = '1em';
+
+                            var infoDiv = document.createElement('div');
+                            infoDiv.style.flex = '1';
+
+                            var header = document.createElement('div');
+                            header.style.fontWeight = 'bold';
+                            header.style.color = '#64B5F6';
+                            header.innerHTML = (cit.item_name || 'Media Item') + 
+                                ' <span style="color: #FFC107; font-size: 0.9em; margin-left: 8px;">[' + (cit.timestamp_formatted || cit.start_time + 's') + ']</span>' +
+                                ' <span style="color: #aaa; font-size: 0.8em; margin-left: 8px;">Score: ' + Math.round(cit.score * 100) + '%</span>';
+
+                            var quote = document.createElement('div');
+                            quote.style.fontSize = '0.9em';
+                            quote.style.color = '#ddd';
+                            quote.style.marginTop = '4px';
+                            quote.textContent = '“' + cit.text + '”';
+
+                            infoDiv.appendChild(header);
+                            infoDiv.appendChild(quote);
+
+                            var playBtn = document.createElement('button');
+                            playBtn.className = 'raised emby-button';
+                            playBtn.style.backgroundColor = '#E50914';
+                            playBtn.style.color = 'white';
+                            playBtn.style.fontSize = '0.85em';
+                            playBtn.style.padding = '6px 12px';
+                            playBtn.style.whiteSpace = 'nowrap';
+                            playBtn.innerHTML = '▶ Play Scene';
+
+                            playBtn.addEventListener('click', function () {
+                                // Jump directly to playback at the specified startPositionTicks
+                                if (cit.item_id) {
+                                    var playbackUrl = '#!/playback?itemId=' + cit.item_id + '&startPositionTicks=' + (cit.start_ticks || 0);
+                                    window.location.hash = playbackUrl;
+                                }
+                            });
+
+                            itemCard.appendChild(infoDiv);
+                            itemCard.appendChild(playBtn);
+                            citationsList.appendChild(itemCard);
+                        });
+                    } else {
+                        var noCit = document.createElement('div');
+                        noCit.style.color = '#aaa';
+                        noCit.style.fontStyle = 'italic';
+                        noCit.textContent = 'No direct scene citations identified.';
+                        citationsList.appendChild(noCit);
+                    }
+                }).catch(function (err) {
+                    statusEl.style.display = 'none';
+                    alert('Failed to query AI: ' + (err.message || 'Check connection to AI Sidecar'));
+                });
             });
 
             pageEl.querySelector('#btnTestConnection').addEventListener('click', function () {
@@ -146,6 +466,14 @@
                     config.IndexMovies = pageEl.querySelector('#IndexMovies').checked;
                     config.IndexEpisodes = pageEl.querySelector('#IndexEpisodes').checked;
                     config.PreferredSubtitleLanguage = pageEl.querySelector('#PreferredSubtitleLanguage').value;
+
+                    // LLM settings
+                    config.LlmProvider = pageEl.querySelector('#LlmProvider').value;
+                    config.LlmApiKey = pageEl.querySelector('#LlmApiKey').value;
+                    config.LlmModel = pageEl.querySelector('#LlmModel').value;
+                    config.LlmBaseUrl = pageEl.querySelector('#LlmBaseUrl').value;
+                    config.LlmTopK = parseInt(pageEl.querySelector('#LlmTopK').value, 10) || 5;
+                    config.LlmTemperature = parseFloat(pageEl.querySelector('#LlmTemperature').value) || 0.2;
 
                     ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);

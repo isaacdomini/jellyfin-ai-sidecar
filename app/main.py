@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.webhooks import router as webhooks_router, search_router
+from app.api.rag import router as rag_router
 from app.services.database import init_db
 
 # Configure logging
@@ -31,7 +32,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Jellyfin AI Sidecar",
-    description="FastAPI backend for Jellyfin Semantic Media Search RAG pipeline",
+    description="FastAPI backend for Jellyfin Semantic Media Search & LLM RAG pipeline",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -48,6 +49,7 @@ app.add_middleware(
 # Register routers
 app.include_router(webhooks_router)
 app.include_router(search_router)
+app.include_router(rag_router)
 
 
 @app.get("/health", tags=["Health"])

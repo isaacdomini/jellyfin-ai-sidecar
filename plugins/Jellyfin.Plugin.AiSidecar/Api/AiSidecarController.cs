@@ -171,6 +171,97 @@ public class AiSidecarController : ControllerBase
     }
 
     /// <summary>
+    /// Executes a RAG (Retrieval-Augmented Generation) query with LLM answering and timestamp deep-links.
+    /// </summary>
+    [HttpPost("Ask")]
+    [HttpPost("Rag")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> AskMedia([FromBody] RagRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Query))
+        {
+            return BadRequest(new { message = "Query string cannot be empty." });
+        }
+
+        var config = Plugin.Instance?.Configuration;
+        if (config == null || string.IsNullOrWhiteSpace(config.SidecarServerUrl))
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "AI Sidecar server URL is not configured." });
+        }
+
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(60);
+
+            string ragUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/rag/query";
+
+            // Fallback to plugin configuration if request didn't override provider settings
+            var payload = new
+            {
+                query = request.Query,
+                item_id = request.ItemId,
+                top_k = request.TopK ?? config.LlmTopK,
+                provider = !string.IsNullOrWhiteSpace(request.Provider) ? request.Provider : config.LlmProvider,
+                api_key = !string.IsNullOrWhiteSpace(request.ApiKey) ? request.ApiKey : config.LlmApiKey,
+                model = !string.IsNullOrWhiteSpace(request.Model) ? request.Model : config.LlmModel,
+                base_url = !string.IsNullOrWhiteSpace(request.BaseUrl) ? request.BaseUrl : config.LlmBaseUrl,
+                temperature = request.Temperature ?? config.LlmTemperature
+            };
+
+            var jsonContent = new StringContent(
+                JsonSerializer.Serialize(payload),
+                Encoding.UTF8,
+                "application/json"
+            );
+
+            var response = await httpClient.PostAsync(ragUrl, jsonContent);
+            var resultString = await response.Content.ReadAsStringAsync();
+
+            return Content(resultString, MediaTypeNames.Application.Json);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while executing RAG query on AI Sidecar");
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Retrieves supported LLM providers from the AI Sidecar.
+    /// </summary>
+    [HttpGet("Providers")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> GetProviders()
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config == null || string.IsNullOrWhiteSpace(config.SidecarServerUrl))
+        {
+            return BadRequest(new { message = "AI Sidecar server URL is not configured." });
+        }
+
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+            string providersUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/rag/providers";
+            var response = await httpClient.GetAsync(providersUrl);
+            var resultString = await response.Content.ReadAsStringAsync();
+
+            return Content(resultString, MediaTypeNames.Application.Json);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve LLM providers from AI Sidecar");
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Triggers indexing across all existing movies and TV episodes in the library.
     /// </summary>
     [HttpPost("SyncLibrary")]
@@ -195,4 +286,16 @@ public class SearchRequest
     public string Query { get; set; } = string.Empty;
     public int TopK { get; set; } = 5;
     public string? ItemId { get; set; }
+}
+
+public class RagRequestDto
+{
+    public string Query { get; set; } = string.Empty;
+    public string? ItemId { get; set; }
+    public int? TopK { get; set; }
+    public string? Provider { get; set; }
+    public string? ApiKey { get; set; }
+    public string? Model { get; set; }
+    public string? BaseUrl { get; set; }
+    public double? Temperature { get; set; }
 }

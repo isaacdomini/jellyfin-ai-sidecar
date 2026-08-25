@@ -188,15 +188,69 @@ Search your indexed media library for dialogue, phrases, or scene descriptions:
 
 ---
 
-## 📂 Subtitle Format Support
+## 🤖 LLM & RAG Query API (Natural Language & Deep-Links)
 
-The sidecar automatically detects and supports:
-- **External Sidecar Subtitles**:
-  - `MovieName.srt`
-  - `MovieName.en.srt`, `MovieName.eng.srt`, `MovieName.default.srt`
-  - Subtitles located in adjacent `Subs/` or `Subtitles/` directories
-- **Embedded Subtitle Streams**: `.mkv`, `.mp4`, `.m4v`, `.webm`, `.avi` with embedded subtitle tracks (extracted on-the-fly with FFmpeg).
-- **Direct SRT Indexing**: Pass the path directly to an `.srt` file in the webhook payload.
+Ask complex natural language questions about scenes, plot lines, or quotes. The sidecar searches the vector DB for matching dialogue chunks, prompts the LLM with timestamp-annotated context, and returns both an answer and instant deep-links jumping straight to that exact scene in the Jellyfin video player!
+
+### Example Query Flow
+
+**Prompt:**
+> *User Query:* "What was the final puzzle the villain left?"
+>
+> *Context:* `[Movie: The Enigma, Timestamp: 01:45:10 - 01:46:20] "The combination is hidden in the painting's frame."`
+>
+> *LLM Answer:* "The villain's final puzzle indicated that the combination is hidden in the painting's frame [The Enigma, 01:45:10 - 01:46:20]."
+
+### Request
+`POST /rag/query` (or `POST /rag/ask`)
+
+```json
+{
+  "query": "What was the final puzzle the villain left?",
+  "item_id": null,
+  "top_k": 5,
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "temperature": 0.2
+}
+```
+
+### Response
+```json
+{
+  "query": "What was the final puzzle the villain left?",
+  "answer": "The villain's final puzzle indicated that the combination is hidden inside the painting's frame [The Enigma, 01:45:10 - 01:46:20].",
+  "provider_used": "openai",
+  "model_used": "gpt-4o-mini",
+  "citations": [
+    {
+      "item_id": "8e3b4822-1d54-4a2b-9e32-a5e2f7b88931",
+      "item_name": "The Enigma",
+      "start_time": 6310.0,
+      "end_time": 6380.0,
+      "timestamp_formatted": "01:45:10 - 01:46:20",
+      "start_ticks": 63100000000,
+      "deep_link": "http://localhost:8096/web/index.html#!/playback?itemId=8e3b4822-1d54-4a2b-9e32-a5e2f7b88931&startPositionTicks=63100000000",
+      "text": "The combination is hidden in the painting's frame.",
+      "score": 0.9325
+    }
+  ],
+  "sources": [ ... ]
+}
+```
+
+---
+
+## 🔌 Supported LLM Providers
+
+| Provider | Default Model | API Key Required? | Base URL Support |
+|---|---|---|---|
+| **OpenAI** | `gpt-4o-mini` | Yes (`sk-...`) | Yes (`https://api.openai.com/v1`) |
+| **Google Gemini** | `gemini-2.0-flash` | Yes (`AIzaSy...`) | No (Google API endpoint) |
+| **Anthropic Claude** | `claude-3-5-haiku-20241022` | Yes (`sk-ant-...`) | No (Anthropic API endpoint) |
+| **Groq** | `llama-3.3-70b-versatile` | Yes (`gsk_...`) | Yes (`https://api.groq.com/openai/v1`) |
+| **Ollama** | `llama3.2` | No | Yes (`http://localhost:11434/v1`) |
+| **Custom / OpenAI-Compatible** | `custom-model` | Optional | Yes (OpenRouter, vLLM, DeepSeek, LocalAI) |
 
 ---
 
@@ -218,7 +272,14 @@ The sidecar automatically detects and supports:
 | `CHUNK_SIZE_SECONDS` | `30` | Sliding window chunk duration |
 | `CHUNK_OVERLAP_SECONDS` | `5` | Sliding window overlap duration |
 | `EMBEDDING_DIMENSION` | `768` | Vector embedding dimension size |
+| `LLM_PROVIDER` | `openai` | Default LLM provider (`openai`, `gemini`, `anthropic`, `groq`, `ollama`, `custom`) |
+| `LLM_API_KEY` | `""` | Default API key for LLM provider |
+| `LLM_MODEL` | `""` | Default LLM model override |
+| `LLM_BASE_URL` | `""` | Custom LLM base URL endpoint |
+| `LLM_TEMPERATURE` | `0.2` | Default sampling temperature |
+| `RAG_TOP_K` | `5` | Default number of vector DB chunks for RAG |
 | `JELLYFIN_SERVER_URL` | `""` | Jellyfin Server URL |
 | `JELLYFIN_API_KEY` | `""` | Jellyfin API Key |
 | `DEBUG` | `false` | Enable verbose debugging logs |
 | `FFMPEG_PATH` | `ffmpeg` | Path to FFmpeg executable |
+

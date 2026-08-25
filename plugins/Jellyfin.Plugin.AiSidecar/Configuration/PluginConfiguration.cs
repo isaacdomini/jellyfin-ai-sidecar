@@ -41,4 +41,34 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the preferred subtitle language code (e.g., 'eng', 'spa', 'fre').
     /// </summary>
     public string PreferredSubtitleLanguage { get; set; } = "eng";
+
+    /// <summary>
+    /// Gets or sets the LLM provider (e.g. OpenAI, Gemini, Anthropic, Groq, Ollama, Custom).
+    /// </summary>
+    public string LlmProvider { get; set; } = "OpenAI";
+
+    /// <summary>
+    /// Gets or sets the API key for the chosen LLM provider.
+    /// </summary>
+    public string LlmApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the LLM model name (e.g. gpt-4o-mini, gemini-2.0-flash, claude-3-5-haiku-20241022, llama-3.3-70b-versatile, llama3.2).
+    /// </summary>
+    public string LlmModel { get; set; } = "gpt-4o-mini";
+
+    /// <summary>
+    /// Gets or sets an optional custom base URL for the LLM provider (e.g. for Ollama or custom OpenAI-compatible endpoint).
+    /// </summary>
+    public string LlmBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the number of top context chunks retrieved for RAG queries.
+    /// </summary>
+    public int LlmTopK { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets the LLM sampling temperature.
+    /// </summary>
+    public double LlmTemperature { get; set; } = 0.2;
 }

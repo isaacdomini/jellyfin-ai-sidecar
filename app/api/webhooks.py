@@ -8,10 +8,11 @@ from app.models.schemas import (
     SearchResponse,
     SearchResultItem
 )
-from app.services.extractor import extract_subtitles
+from app.services.extractor import extract_best_single_subtitle, extract_subtitles
 from app.core.chunker import chunk_subtitles
 from app.services.embedder import get_embeddings, get_embedding
 from app.services.database import insert_chunks, search_similar_chunks
+from app.services.llm import llm_service
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/webhook", tags=["Jellyfin Webhooks"])
 search_router = APIRouter(prefix="/search", tags=["Semantic Search"])
 
 
-def process_media_item_background(
+async def process_media_item_background(
     item_id: str,
     item_name: Optional[str] = None,
     file_path: Optional[str] = None,
@@ -28,10 +29,11 @@ def process_media_item_background(
 ) -> None:
     """
     Asynchronous background pipeline:
-    1. Extracts subtitle stream from the media file using FFmpeg.
-    2. Segments subtitle text into overlapping chunks using pysrt.
-    3. Generates 768-dimensional vector embeddings for each chunk.
-    4. Inserts chunks with pgvector embeddings into PostgreSQL.
+    1. Extracts the single best English subtitle track (or single foreign subtitle track if no English exists).
+    2. If subtitles are in a foreign language, translates dialogue chunks to English.
+    3. Segments subtitle text into overlapping chunks using pysrt.
+    4. Generates 768-dimensional vector embeddings for each chunk.
+    5. Inserts chunks with pgvector embeddings into PostgreSQL.
     """
     logger.info(f"Starting background processing for item: id={item_id}, name='{item_name}'")
     chunks = []
@@ -39,29 +41,38 @@ def process_media_item_background(
     # Attempt subtitle extraction if file exists
     if file_path and os.path.exists(file_path):
         try:
-            logger.info(f"Extracting subtitles via ffmpeg from {file_path}")
-            srt_content = extract_subtitles(file_path)
+            srt_content, detected_lang, is_english = extract_best_single_subtitle(file_path)
             if srt_content.strip():
-                chunks = chunk_subtitles(
+                raw_chunks = chunk_subtitles(
                     srt_content,
                     chunk_size_seconds=settings.CHUNK_SIZE_SECONDS,
                     overlap_seconds=settings.CHUNK_OVERLAP_SECONDS
                 )
-                logger.info(f"Generated {len(chunks)} overlapping chunks from subtitle stream.")
+                logger.info(f"Generated {len(raw_chunks)} chunks (lang='{detected_lang}', english={is_english}).")
+
+                # If subtitles are in a foreign language, translate to English
+                if not is_english and detected_lang not in ["eng", "en", "english"]:
+                    logger.info(f"Translating non-English ({detected_lang}) subtitles to English for '{item_name}'...")
+                    chunks = await llm_service.translate_chunks_to_english(
+                        raw_chunks,
+                        source_language=detected_lang
+                    )
+                else:
+                    chunks = raw_chunks
         except Exception as exc:
             logger.error(f"Failed to extract or chunk subtitles for item {item_id}: {exc}", exc_info=True)
 
-    # Fallback to overview metadata if no subtitle chunks were extracted
-    if not chunks and overview and overview.strip():
-        logger.info(f"Using overview text fallback for item {item_id}")
-        chunks = [{
-            "text": overview.strip(),
+    # Include overview plot synopsis chunk if available for plot-level and thematic searches
+    if overview and overview.strip():
+        overview_chunk = {
+            "text": f"Plot Summary: {overview.strip()}",
             "start_time": 0.0,
-            "end_time": 60.0,
+            "end_time": 0.0,
             "start_time_ms": 0,
-            "end_time_ms": 60000,
+            "end_time_ms": 0,
             "item_count": 1
-        }]
+        }
+        chunks.insert(0, overview_chunk)
 
     if not chunks:
         logger.warning(f"No subtitle or overview content available to index for item {item_id}")
