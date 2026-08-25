@@ -30,7 +30,7 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '7.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Determine Plugin Version
         id: get_version
@@ -101,7 +101,7 @@ jobs:
                 {
                   "version": "${{ steps.get_version.outputs.VERSION }}",
                   "changelog": "Release version ${{ steps.get_version.outputs.VERSION }}",
-                  "targetAbi": "10.8.0.0",
+                  "targetAbi": "10.9.0.0",
                   "sourceUrl": "$ZIP_URL",
                   "checksum": "${{ steps.package.outputs.CHECKSUM }}",
                   "timestamp": "$TIMESTAMP"

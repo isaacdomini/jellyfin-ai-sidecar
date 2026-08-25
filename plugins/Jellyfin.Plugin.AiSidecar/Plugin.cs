@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Jellyfin.Plugin.AiSidecar.Configuration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
@@ -29,12 +30,18 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public IEnumerable<PluginPageInfo> GetPages()
     {
+        var resourcePath = string.Format(CultureInfo.InvariantCulture, "{0}.Configuration.configPage.html", GetType().Namespace);
         return new[]
         {
             new PluginPageInfo
             {
                 Name = "AiSidecar",
-                EmbeddedResourcePath = $"{GetType().Namespace}.Configuration.configPage.html"
+                EmbeddedResourcePath = resourcePath
+            },
+            new PluginPageInfo
+            {
+                Name = this.Name,
+                EmbeddedResourcePath = resourcePath
             }
         };
     }
