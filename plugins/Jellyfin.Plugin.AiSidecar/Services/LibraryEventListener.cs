@@ -8,15 +8,15 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Plugins;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AiSidecar.Services;
 
 /// <summary>
-/// Server entry point that listens to Jellyfin library events and triggers the AI Sidecar indexing pipeline.
+/// Hosted service that listens to Jellyfin library events and triggers the AI Sidecar indexing pipeline.
 /// </summary>
-public class LibraryEventListener : IServerEntryPoint
+public class LibraryEventListener : IHostedService, IDisposable
 {
     private readonly ILibraryManager _libraryManager;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -32,11 +32,18 @@ public class LibraryEventListener : IServerEntryPoint
         _logger = logger;
     }
 
-    public Task RunAsync()
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         _libraryManager.ItemAdded += OnItemAdded;
         _libraryManager.ItemUpdated += OnItemUpdated;
         _logger.LogInformation("AI Sidecar Library Event Listener initialized.");
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _libraryManager.ItemAdded -= OnItemAdded;
+        _libraryManager.ItemUpdated -= OnItemUpdated;
         return Task.CompletedTask;
     }
 
@@ -126,7 +133,7 @@ public class LibraryEventListener : IServerEntryPoint
                 httpClient.DefaultRequestHeaders.Add("X-API-Key", config.ApiKey);
             }
 
-            _logger.LogInformation("Notifying AI Sidecar of new media: {Name} ({Path})", item.Name, item.Path);
+            _logger.LogInformation("Notifying AI Sidecar of media event ({Event}): {Name} ({Path})", eventType, item.Name, item.Path);
             var response = await httpClient.PostAsync(endpoint, jsonContent).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
@@ -140,7 +147,7 @@ public class LibraryEventListener : IServerEntryPoint
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send item-added notification to AI Sidecar for item: {Name}", item.Name);
+            _logger.LogError(ex, "Failed to send media event notification to AI Sidecar for item: {Name}", item.Name);
         }
     }
 
