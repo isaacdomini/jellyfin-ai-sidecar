@@ -47,17 +47,27 @@ public class LibraryEventListener : IServerEntryPoint
 
     private void OnItemUpdated(object? sender, ItemChangeEventArgs e)
     {
-        // Optional: re-index when item metadata is significantly refreshed
-        if (e.Item is Movie || e.Item is Episode)
+        var config = Plugin.Instance?.Configuration;
+        if (config != null && config.AutoIndexOnUpdate)
         {
-            _logger.LogDebug("Media item updated: {Name}", e.Item.Name);
+            _ = ProcessItemAsync(e.Item, "ItemUpdated");
         }
     }
 
     private async Task ProcessItemAsync(BaseItem item, string eventType)
     {
         var config = Plugin.Instance?.Configuration;
-        if (config == null || !config.AutoIndexOnAdd)
+        if (config == null)
+        {
+            return;
+        }
+
+        if (eventType == "ItemAdded" && !config.AutoIndexOnAdd)
+        {
+            return;
+        }
+
+        if (eventType == "ItemUpdated" && !config.AutoIndexOnUpdate)
         {
             return;
         }

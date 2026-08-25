@@ -11,7 +11,7 @@
                 <form id="aiSidecarConfigForm">
                     <div class="sectionTitleContainer flex align-items-center">
                         <h2 class="sectionTitle">AI Sidecar (Semantic Search)</h2>
-                        <a is="emby-linkbutton" class="raised button-alt headerHelpButton emby-button" target="_blank" href="https://github.com">Help</a>
+                        <a is="emby-linkbutton" class="raised button-alt headerHelpButton emby-button" target="_blank" href="https://github.com/isaacdomini/jellyfin-ai-sidecar">Help</a>
                     </div>
                     <p class="fieldDescription">
                         Configure the connection to the Jellyfin AI Sidecar service for subtitle indexing and semantic scene search.
@@ -34,7 +34,15 @@
                             <input is="emby-checkbox" type="checkbox" id="AutoIndexOnAdd" name="AutoIndexOnAdd" />
                             <span>Automatically index new media when added</span>
                         </label>
-                        <div class="fieldDescription checkboxFieldDescription">Automatically trigger subtitle extraction and vectorization when a movie or episode is scanned.</div>
+                        <div class="fieldDescription checkboxFieldDescription">Automatically trigger subtitle extraction and vectorization when a new movie or episode is scanned.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="AutoIndexOnUpdate" name="AutoIndexOnUpdate" />
+                            <span>Automatically re-index when media is updated (e.g. new subtitles added)</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Automatically re-extract and vectorize when subtitle files are added or metadata is refreshed.</div>
                     </div>
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
@@ -57,12 +65,15 @@
                         <div class="fieldDescription">3-letter language code (e.g. <code>eng</code>, <code>spa</code>, <code>fre</code>) for subtitle extraction.</div>
                     </div>
 
-                    <div style="margin-top: 2em; display: flex; gap: 1em;">
+                    <div style="margin-top: 2em; display: flex; flex-wrap: wrap; gap: 1em;">
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save Settings</span>
                         </button>
                         <button is="emby-button" type="button" id="btnTestConnection" class="raised button-alt emby-button">
                             <span>Test Connection</span>
+                        </button>
+                        <button is="emby-button" type="button" id="btnSyncLibrary" class="raised button-alt emby-button" style="background-color: #2196F3; color: white;">
+                            <span>⚡ Index Entire Library Now</span>
                         </button>
                     </div>
 
@@ -80,6 +91,7 @@
                     document.querySelector('#SidecarServerUrl').value = config.SidecarServerUrl || "http://localhost:8000";
                     document.querySelector('#ApiKey').value = config.ApiKey || "";
                     document.querySelector('#AutoIndexOnAdd').checked = config.AutoIndexOnAdd !== false;
+                    document.querySelector('#AutoIndexOnUpdate').checked = config.AutoIndexOnUpdate !== false;
                     document.querySelector('#IndexMovies').checked = config.IndexMovies !== false;
                     document.querySelector('#IndexEpisodes').checked = config.IndexEpisodes !== false;
                     document.querySelector('#PreferredSubtitleLanguage').value = config.PreferredSubtitleLanguage || "eng";
@@ -101,6 +113,23 @@
                 });
             });
 
+            document.querySelector('#btnSyncLibrary').addEventListener('click', function () {
+                var statusEl = document.querySelector('#connectionStatus');
+                statusEl.textContent = "Starting full library scan and indexing in background...";
+                statusEl.style.color = "#2196F3";
+
+                ApiClient.fetch({
+                    url: ApiClient.getUrl('Plugins/AiSidecar/SyncLibrary'),
+                    type: 'POST'
+                }).then(function () {
+                    statusEl.textContent = "✓ Full library indexing started! You can check progress in Dashboard > Scheduled Tasks.";
+                    statusEl.style.color = "#4CAF50";
+                }).catch(function (err) {
+                    statusEl.textContent = "✗ Failed to start sync: " + (err.message || "Unknown error");
+                    statusEl.style.color = "#F44336";
+                });
+            });
+
             document.querySelector('#aiSidecarConfigForm').addEventListener('submit', function (e) {
                 e.preventDefault();
                 Dashboard.showLoadingMsg();
@@ -109,6 +138,7 @@
                     config.SidecarServerUrl = document.querySelector('#SidecarServerUrl').value;
                     config.ApiKey = document.querySelector('#ApiKey').value;
                     config.AutoIndexOnAdd = document.querySelector('#AutoIndexOnAdd').checked;
+                    config.AutoIndexOnUpdate = document.querySelector('#AutoIndexOnUpdate').checked;
                     config.IndexMovies = document.querySelector('#IndexMovies').checked;
                     config.IndexEpisodes = document.querySelector('#IndexEpisodes').checked;
                     config.PreferredSubtitleLanguage = document.querySelector('#PreferredSubtitleLanguage').value;

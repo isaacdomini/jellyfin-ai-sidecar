@@ -169,6 +169,25 @@ public class AiSidecarController : ControllerBase
 
         return StatusCode((int)response.StatusCode, new { status = "error", message = "Failed to queue indexing task." });
     }
+
+    /// <summary>
+    /// Triggers indexing across all existing movies and TV episodes in the library.
+    /// </summary>
+    [HttpPost("SyncLibrary")]
+    [Authorize(Policy = "RequiresElevation")]
+    public ActionResult SyncLibrary()
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config == null || string.IsNullOrWhiteSpace(config.SidecarServerUrl))
+        {
+            return BadRequest(new { message = "AI Sidecar server URL is not configured." });
+        }
+
+        var task = new Services.LibrarySyncTask(_libraryManager, _httpClientFactory, LoggerFactory.Create(b => {}).CreateLogger<Services.LibrarySyncTask>());
+        _ = Task.Run(() => task.ExecuteAsync(new Progress<double>(), CancellationToken.None));
+
+        return Ok(new { status = "started", message = "Library synchronization has been started in the background." });
+    }
 }
 
 public class SearchRequest

@@ -86,12 +86,13 @@ def process_media_item_background(
 
 
 @router.post("/item-added", status_code=status.HTTP_200_OK)
-async def item_added_webhook(
+@router.post("/item-updated", status_code=status.HTTP_200_OK)
+async def item_event_webhook(
     payload: JellyfinItemEvent,
     background_tasks: BackgroundTasks
 ):
     """
-    Accepts Jellyfin ItemAdded webhook events, returns 200 OK immediately,
+    Accepts Jellyfin ItemAdded and ItemUpdated webhook events, returns 200 OK immediately,
     and triggers extraction, chunking, and database insertion asynchronously.
     """
     item_id = payload.get_item_id() or "unknown_item"
@@ -99,7 +100,7 @@ async def item_added_webhook(
     file_path = payload.get_file_path()
     overview = payload.get_overview()
 
-    logger.info(f"Received webhook for media item: id='{item_id}', name='{item_name}', path='{file_path}'")
+    logger.info(f"Received webhook for media item: event='{payload.event or payload.NotificationType}', id='{item_id}', name='{item_name}', path='{file_path}'")
 
     # Queue extraction, chunking, and vector insertion in the background
     background_tasks.add_task(

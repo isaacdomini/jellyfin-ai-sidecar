@@ -23,6 +23,11 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool AutoIndexOnAdd { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets a value indicating whether modified media items (e.g. newly added subtitles) should be automatically re-indexed.
+    /// </summary>
+    public bool AutoIndexOnUpdate { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets a value indicating whether movie items are indexed.
     /// </summary>
     public bool IndexMovies { get; set; } = true;
