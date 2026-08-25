@@ -56,7 +56,7 @@ public class LibrarySyncTask : IScheduledTask
         var config = Plugin.Instance?.Configuration;
         if (config == null || string.IsNullOrWhiteSpace(config.SidecarServerUrl))
         {
-            _logger.LogWarning("AI Sidecar server URL is not configured. Aborting library sync.");
+            Console.WriteLine("[LibrarySyncTask] AI Sidecar server URL is not configured. Aborting library sync.");
             return;
         }
 
@@ -73,7 +73,7 @@ public class LibrarySyncTask : IScheduledTask
 
         if (items.Count == 0)
         {
-            _logger.LogInformation("No media items found to index.");
+            Console.WriteLine("[LibrarySyncTask] No media items found to index.");
             progress.Report(100.0);
             return;
         }
