@@ -25,7 +25,7 @@ PROVIDERS_INFO: Dict[str, Dict[str, Any]] = {
     "gemini": {
         "name": "Google Gemini",
         "default_model": "gemini-3.7-flash",
-        "available_models": ["gemini-3.7-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+        "available_models": ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest"],
         "requires_api_key": True,
         "supports_base_url": False,
         "default_base_url": "https://generativelanguage.googleapis.com"
@@ -312,14 +312,18 @@ class LLMService:
             raise ValueError("Gemini API key is required. Please set LLM_API_KEY or configure it in the plugin settings.")
 
         fallback_models = [model]
-        if model != "gemini-2.0-flash" and "gemini-2.0-flash" not in fallback_models:
-            fallback_models.append("gemini-2.0-flash")
-        if "gemini-1.5-flash" not in fallback_models:
-            fallback_models.append("gemini-1.5-flash")
+        for fallback in ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash"]:
+            if fallback not in fallback_models:
+                fallback_models.append(fallback)
+
+        headers = {
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        }
 
         last_error = None
         for current_model in fallback_models:
-            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={api_key}"
+            endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent"
             payload = {
                 "system_instruction": {
                     "parts": [{"text": system_prompt}]
@@ -339,7 +343,7 @@ class LLMService:
             for attempt in range(2):
                 try:
                     async with httpx.AsyncClient(timeout=self.timeout) as client:
-                        response = await client.post(endpoint, json=payload)
+                        response = await client.post(endpoint, json=payload, headers=headers)
                         response.raise_for_status()
                         data = response.json()
                         candidates = data.get("candidates", [])
@@ -352,7 +356,7 @@ class LLMService:
                     # If 503 (overloaded) or 429 (rate limit), retry after brief backoff or try next fallback model
                     if e.response.status_code in [503, 429] and attempt == 0:
                         import asyncio
-                        await asyncio.sleep(1.0)
+                        await asyncio.sleep(1.5)
                         continue
                     break
                 except Exception as e:
