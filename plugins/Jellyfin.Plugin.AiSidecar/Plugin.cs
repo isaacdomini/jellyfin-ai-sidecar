@@ -29,12 +29,23 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public IEnumerable<PluginPageInfo> GetPages()
     {
+        var resourcePath = $"{GetType().Namespace}.Configuration.configPage.html";
         return new[]
         {
             new PluginPageInfo
             {
                 Name = this.Name,
-                EmbeddedResourcePath = string.Format("{0}.Configuration.configPage.html", GetType().Namespace)
+                EmbeddedResourcePath = resourcePath
+            },
+            new PluginPageInfo
+            {
+                Name = "AiSidecar",
+                EmbeddedResourcePath = resourcePath
+            },
+            new PluginPageInfo
+            {
+                Name = "aisidecar",
+                EmbeddedResourcePath = resourcePath
             }
         };
     }

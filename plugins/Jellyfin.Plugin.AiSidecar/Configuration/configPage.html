@@ -85,7 +85,7 @@
         <script type="text/javascript">
             var pluginId = "7c9e3f22-1d54-4a2b-9e32-a5e2f7b88931";
 
-            document.querySelector('#aiSidecarConfigPage').addEventListener('pageshow', function () {
+            function loadConfig() {
                 Dashboard.showLoadingMsg();
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     document.querySelector('#SidecarServerUrl').value = config.SidecarServerUrl || "http://localhost:8000";
@@ -96,8 +96,14 @@
                     document.querySelector('#IndexEpisodes').checked = config.IndexEpisodes !== false;
                     document.querySelector('#PreferredSubtitleLanguage').value = config.PreferredSubtitleLanguage || "eng";
                     Dashboard.hideLoadingMsg();
+                }).catch(function () {
+                    Dashboard.hideLoadingMsg();
                 });
-            });
+            }
+
+            var configPageEl = document.querySelector('#aiSidecarConfigPage');
+            configPageEl.addEventListener('pageshow', loadConfig);
+            configPageEl.addEventListener('viewshow', loadConfig);
 
             document.querySelector('#btnTestConnection').addEventListener('click', function () {
                 var statusEl = document.querySelector('#connectionStatus');
