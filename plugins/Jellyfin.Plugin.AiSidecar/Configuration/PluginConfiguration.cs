@@ -65,7 +65,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>
     /// Gets or sets the number of top context chunks retrieved for RAG queries.
     /// </summary>
-    public int LlmTopK { get; set; } = 5;
+    public int LlmTopK { get; set; } = 15;
 
     /// <summary>
     /// Gets or sets the LLM sampling temperature.

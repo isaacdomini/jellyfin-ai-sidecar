@@ -70,8 +70,8 @@
                     <div style="display: flex; gap: 1.5em; flex-wrap: wrap;">
                         <div class="inputContainer" style="flex: 1; min-width: 200px;">
                             <label class="inputLabel inputLabelUnfocused" for="LlmTopK">Max Context Chunks (Top-K)</label>
-                            <input is="emby-input" type="number" id="LlmTopK" name="LlmTopK" min="1" max="25" value="5" />
-                            <div class="fieldDescription">Number of dialogue chunks retrieved from vector DB.</div>
+                            <input is="emby-input" type="number" id="LlmTopK" name="LlmTopK" min="1" max="50" value="15" />
+                            <div class="fieldDescription">Number of dialogue chunks retrieved from vector DB (default: 15).</div>
                         </div>
 
                         <div class="inputContainer" style="flex: 1; min-width: 200px;">

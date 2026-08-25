@@ -142,7 +142,8 @@ async def search_media(query: SearchQuery):
     results = search_similar_chunks(
         query_embedding=query_embedding,
         top_k=query.top_k,
-        item_id=query.item_id
+        item_id=query.item_id,
+        query_text=query.query
     )
 
     formatted_results = [

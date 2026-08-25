@@ -89,7 +89,7 @@ class SearchResponse(BaseModel):
 class RagQueryRequest(BaseModel):
     query: str = Field(..., description="User query or question to answer using media context")
     item_id: Optional[str] = Field(None, description="Optional media item ID to restrict the search")
-    top_k: int = Field(default=5, ge=1, le=50, description="Number of context chunks to retrieve")
+    top_k: int = Field(default=15, ge=1, le=50, description="Number of context chunks to retrieve")
     provider: Optional[str] = Field(None, description="LLM provider: 'openai', 'gemini', 'anthropic', 'groq', 'ollama', 'custom', 'mock'")
     api_key: Optional[str] = Field(None, description="API key override for the LLM provider")
     model: Optional[str] = Field(None, description="Model identifier override")

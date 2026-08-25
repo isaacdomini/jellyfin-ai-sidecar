@@ -38,12 +38,13 @@ async def query_rag(request: RagQueryRequest):
     )
 
     try:
-        # Retrieve vector similarity search results
+        # Retrieve vector similarity search results with Hybrid Search
         query_embedding = get_embedding(request.query)
         raw_chunks = search_similar_chunks(
             query_embedding=query_embedding,
             top_k=request.top_k,
-            item_id=request.item_id
+            item_id=request.item_id,
+            query_text=request.query
         )
 
         formatted_chunks = [

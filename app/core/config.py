@@ -101,7 +101,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AI_SIDECAR_LLM_MAX_TOKENS", "LLM_MAX_TOKENS")
     )
     RAG_TOP_K: int = Field(
-        default=5,
+        default=15,
         validation_alias=AliasChoices("AI_SIDECAR_RAG_TOP_K", "RAG_TOP_K")
     )
 

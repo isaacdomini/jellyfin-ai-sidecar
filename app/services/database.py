@@ -121,31 +121,67 @@ def insert_chunks(
 
 def search_similar_chunks(
     query_embedding: List[float],
-    top_k: int = 5,
-    item_id: Optional[str] = None
+    top_k: int = 15,
+    item_id: Optional[str] = None,
+    query_text: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Searches for the most semantically similar subtitle chunks using pgvector cosine distance.
+    Searches for the most relevant subtitle chunks using Hybrid Search:
+    combining pgvector cosine semantic similarity and exact keyword/entity matching.
 
     :param query_embedding: 768-dimensional query vector
-    :param top_k: Maximum number of results to return
+    :param top_k: Maximum number of results to return (default: 15)
     :param item_id: Optional filter for a specific media item
+    :param query_text: Optional raw text query for keyword boosting/filtering
     :return: List of result dictionaries with similarity score and timestamp info
     """
     session: Session = SessionLocal()
     try:
-        # Cosine distance ordering: lower distance = higher similarity
+        from sqlalchemy import or_
+        seen_ids = set()
+        formatted_results = []
+
+        # 1. Keyword search boost if specific query phrases/words exist
+        if query_text and len(query_text.strip()) > 2:
+            cleaned_query = query_text.strip()
+            # Search for full phrase or prominent keywords
+            keyword_filters = [SubtitleChunk.chunk_text.ilike(f"%{cleaned_query}%")]
+            # Also check individual words if phrase is longer
+            words = [w for w in cleaned_query.split() if len(w) >= 4 and w.lower() not in {"what", "when", "where", "which", "about", "could", "would", "their", "there"}]
+            for w in words[:3]:
+                keyword_filters.append(SubtitleChunk.chunk_text.ilike(f"%{w}%"))
+
+            kw_stmt = select(SubtitleChunk).where(or_(*keyword_filters))
+            if item_id:
+                kw_stmt = kw_stmt.where(SubtitleChunk.item_id == item_id)
+            kw_stmt = kw_stmt.limit(top_k)
+            kw_results = session.execute(kw_stmt).scalars().all()
+
+            for chunk in kw_results:
+                seen_ids.add(chunk.id)
+                formatted_results.append({
+                    "id": chunk.id,
+                    "item_id": chunk.item_id,
+                    "item_name": chunk.item_name,
+                    "text": chunk.chunk_text,
+                    "start_time": chunk.start_time,
+                    "end_time": chunk.end_time,
+                    "score": 0.99  # Direct keyword hit
+                })
+
+        # 2. Semantic vector search
         distance_expr = SubtitleChunk.embedding.cosine_distance(query_embedding).label("distance")
         stmt = select(SubtitleChunk, distance_expr)
-
         if item_id:
             stmt = stmt.where(SubtitleChunk.item_id == item_id)
 
-        stmt = stmt.order_by(distance_expr.asc()).limit(top_k)
+        stmt = stmt.order_by(distance_expr.asc()).limit(top_k * 2)
         results = session.execute(stmt).all()
 
-        formatted_results = []
         for chunk, distance in results:
+            if chunk.id in seen_ids:
+                continue
+            seen_ids.add(chunk.id)
             similarity = 1.0 - float(distance) if distance is not None else 0.0
             formatted_results.append({
                 "id": chunk.id,
@@ -157,7 +193,10 @@ def search_similar_chunks(
                 "score": round(similarity, 4)
             })
 
-        return formatted_results
+            if len(formatted_results) >= top_k:
+                break
+
+        return formatted_results[:top_k]
     finally:
         session.close()
 
