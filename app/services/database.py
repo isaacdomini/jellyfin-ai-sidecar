@@ -161,3 +161,46 @@ def search_similar_chunks(
     finally:
         session.close()
 
+
+def get_library_stats() -> Dict[str, Any]:
+    """
+    Returns statistics about indexed media items and chunks in the vector database.
+    """
+    session: Session = SessionLocal()
+    try:
+        total_chunks = session.query(func.count(SubtitleChunk.id)).scalar() or 0
+        total_items = session.query(func.count(func.distinct(SubtitleChunk.item_id))).scalar() or 0
+
+        # Query items with chunk counts
+        items_query = (
+            session.query(
+                SubtitleChunk.item_id,
+                SubtitleChunk.item_name,
+                func.count(SubtitleChunk.id).label("chunk_count"),
+                func.max(SubtitleChunk.created_at).label("indexed_at")
+            )
+            .group_by(SubtitleChunk.item_id, SubtitleChunk.item_name)
+            .order_by(func.max(SubtitleChunk.created_at).desc())
+            .limit(100)
+            .all()
+        )
+
+        items_list = [
+            {
+                "item_id": item.item_id,
+                "item_name": item.item_name or "Unknown",
+                "chunk_count": item.chunk_count,
+                "indexed_at": item.indexed_at.isoformat() if item.indexed_at else None
+            }
+            for item in items_query
+        ]
+
+        return {
+            "total_items": total_items,
+            "total_chunks": total_chunks,
+            "items": items_list
+        }
+    finally:
+        session.close()
+
+

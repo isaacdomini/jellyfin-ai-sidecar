@@ -152,6 +152,12 @@ def test_fastapi_rag_endpoints():
         alias_data = alias_res.json()
         assert alias_data["query"] == query_payload["query"]
 
+        # Test /stats endpoint
+        with patch("app.services.database.get_library_stats", return_value={"total_items": 5, "total_chunks": 250, "items": []}):
+            stats_res = client.get("/stats")
+            assert stats_res.status_code == 200
+            assert stats_res.json()["total_items"] == 5
+
 
 @pytest.mark.asyncio
 async def test_openai_compatible_call():
