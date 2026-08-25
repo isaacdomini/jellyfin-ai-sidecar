@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 # Supported subtitle file extensions
 SUBTITLE_EXTENSIONS = [".srt", ".vtt", ".ass", ".ssa", ".sub"]
 ENGLISH_LANG_CODES = {"eng", "en", "english", "en-us", "en-gb", "en-ca"}
+BITMAP_SUBTITLE_CODECS = {"hdmv_pgs_subtitle", "pgssub", "dvd_subtitle", "dvdsub", "xsub", "dvb_subtitle", "dvbsub"}
 
 
 def is_english_identifier(lang_or_title: Optional[str]) -> bool:
@@ -27,7 +28,7 @@ def is_english_identifier(lang_or_title: Optional[str]) -> bool:
 def probe_subtitle_streams(file_path: str) -> List[Dict[str, Any]]:
     """
     Probes embedded subtitle streams in a media file using ffprobe.
-    Returns list of dicts with stream index, relative subtitle index, language tag, title, and flags.
+    Returns list of dicts with stream index, relative subtitle index, codec_name, language tag, title, and flags.
     """
     if not os.path.exists(file_path):
         return []
@@ -37,7 +38,7 @@ def probe_subtitle_streams(file_path: str) -> List[Dict[str, Any]]:
             settings.FFPROBE_PATH,
             "-v", "error",
             "-select_streams", "s",
-            "-show_entries", "stream=index:stream_tags=language,title:stream_disposition=forced,hearing_impaired",
+            "-show_entries", "stream=index,codec_name:stream_tags=language,title:stream_disposition=forced,hearing_impaired",
             "-of", "json",
             file_path
         ]
@@ -53,14 +54,18 @@ def probe_subtitle_streams(file_path: str) -> List[Dict[str, Any]]:
         for rel_idx, stream in enumerate(streams):
             tags = stream.get("tags") or {}
             disposition = stream.get("disposition") or {}
+            codec = stream.get("codec_name", "").lower()
             lang = tags.get("language", "und").lower()
             title = tags.get("title", "")
             is_forced = bool(disposition.get("forced", 0))
             is_sdh = bool(disposition.get("hearing_impaired", 0))
+            is_bitmap = codec in BITMAP_SUBTITLE_CODECS
 
             classified.append({
                 "stream_index": stream.get("index"),
                 "relative_index": rel_idx,
+                "codec_name": codec,
+                "is_bitmap": is_bitmap,
                 "language": lang,
                 "title": title,
                 "is_english": is_english_identifier(lang) or is_english_identifier(title),
@@ -229,20 +234,20 @@ def extract_best_single_subtitle(file_path: str) -> Tuple[str, str, bool]:
     # 2. Inspect Embedded Subtitle Streams
     embedded_streams = probe_subtitle_streams(file_path)
 
-    # Check for English embedded streams (prefer non-forced dialogue)
-    eng_streams = [s for s in embedded_streams if s["is_english"] and not s["is_forced"]]
+    # Check for English text streams (skip bitmap/PGS streams that FFmpeg cannot convert to text)
+    eng_streams = [s for s in embedded_streams if s["is_english"] and not s.get("is_bitmap") and not s["is_forced"]]
     if not eng_streams:
-        eng_streams = [s for s in embedded_streams if s["is_english"]]
+        eng_streams = [s for s in embedded_streams if s["is_english"] and not s.get("is_bitmap")]
 
     if eng_streams:
         best_stream = eng_streams[0]
-        logger.info(f"Selected single English embedded subtitle stream for {file_path} (relative index: 0:s:{best_stream['relative_index']})")
+        logger.info(f"Selected single English embedded subtitle stream ({best_stream.get('codec_name', 'text')}) for {file_path} (0:s:{best_stream['relative_index']})")
         content = extract_embedded_stream_to_srt(file_path, best_stream["relative_index"])
         if content.strip():
             return content, "eng", True
 
     # 3. If NO English subtitles exist, look for foreign external or embedded subtitles
-    logger.info(f"No English subtitles found for {file_path}. Searching for foreign subtitles to translate...")
+    logger.info(f"No English text subtitles found for {file_path}. Searching for foreign subtitles...")
 
     # Check foreign external subtitles
     foreign_externals = [s for s in external_subs if not s["is_forced"]] or external_subs
@@ -254,19 +259,23 @@ def extract_best_single_subtitle(file_path: str) -> Tuple[str, str, bool]:
                 return f.read(), best_foreign["language"], False
         return convert_to_srt(best_foreign["file_path"]), best_foreign["language"], False
 
-    # Check foreign embedded streams
-    foreign_streams = [s for s in embedded_streams if not s["is_forced"]] or embedded_streams
+    # Check foreign embedded text streams (skip bitmap/PGS)
+    foreign_streams = [s for s in embedded_streams if not s.get("is_bitmap") and not s["is_forced"]] or [s for s in embedded_streams if not s.get("is_bitmap")]
     if foreign_streams:
         best_foreign_stream = foreign_streams[0]
-        logger.info(f"Found foreign embedded subtitle stream ({best_foreign_stream['language']}) at 0:s:{best_foreign_stream['relative_index']}")
+        logger.info(f"Found foreign embedded text stream ({best_foreign_stream.get('codec_name', 'text')}, {best_foreign_stream['language']}) at 0:s:{best_foreign_stream['relative_index']}")
         content = extract_embedded_stream_to_srt(file_path, best_foreign_stream["relative_index"])
         if content.strip():
             return content, best_foreign_stream["language"], False
 
-    # Fallback to default 0:s:0 if ffprobe found nothing but ffmpeg might extract something
-    logger.info(f"Attempting default 0:s:0 fallback extraction for {file_path}")
-    content = extract_embedded_stream_to_srt(file_path, 0)
-    return content, "und", False
+    # Check if file only had bitmap (PGS/VobSub) subtitles
+    bitmap_streams = [s for s in embedded_streams if s.get("is_bitmap")]
+    if bitmap_streams:
+        logger.info(f"Embedded subtitles in {file_path} are image/bitmap PGS format ({bitmap_streams[0].get('codec_name')}). Skipping bitmap conversion (requires external .srt or text stream).")
+        return "", "und", False
+
+    # If no streams detected, return empty without running invalid conversion
+    return "", "und", False
 
 
 def extract_subtitles(file_path: str, subtitle_index: int = 0) -> str:
