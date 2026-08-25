@@ -1,19 +1,19 @@
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices
 
 
 class JellyfinItem(BaseModel):
-    Id: Optional[str] = None
-    Name: Optional[str] = None
-    Type: Optional[str] = None  # e.g., "Movie", "Episode"
-    SeriesName: Optional[str] = None
-    SeasonName: Optional[str] = None
-    IndexNumber: Optional[int] = None
-    ParentIndexNumber: Optional[int] = None
-    Overview: Optional[str] = None
-    Path: Optional[str] = None
-    RunTimeTicks: Optional[int] = None
-    MediaSources: Optional[List[Dict[str, Any]]] = None
+    Id: Optional[str] = Field(default=None, validation_alias=AliasChoices("Id", "id", "ItemId", "item_id"))
+    Name: Optional[str] = Field(default=None, validation_alias=AliasChoices("Name", "name", "ItemName", "item_name"))
+    Type: Optional[str] = Field(default=None, validation_alias=AliasChoices("Type", "type", "ItemType", "item_type"))
+    SeriesName: Optional[str] = Field(default=None, validation_alias=AliasChoices("SeriesName", "seriesName", "series_name"))
+    SeasonName: Optional[str] = Field(default=None, validation_alias=AliasChoices("SeasonName", "seasonName", "season_name"))
+    IndexNumber: Optional[int] = Field(default=None, validation_alias=AliasChoices("IndexNumber", "indexNumber", "index_number"))
+    ParentIndexNumber: Optional[int] = Field(default=None, validation_alias=AliasChoices("ParentIndexNumber", "parentIndexNumber", "parent_index_number"))
+    Overview: Optional[str] = Field(default=None, validation_alias=AliasChoices("Overview", "overview"))
+    Path: Optional[str] = Field(default=None, validation_alias=AliasChoices("Path", "path", "ItemPath", "item_path"))
+    RunTimeTicks: Optional[int] = Field(default=None, validation_alias=AliasChoices("RunTimeTicks", "runTimeTicks", "run_time_ticks"))
+    MediaSources: Optional[List[Dict[str, Any]]] = Field(default=None, validation_alias=AliasChoices("MediaSources", "mediaSources", "media_sources"))
 
 
 class JellyfinItemEvent(BaseModel):
@@ -21,18 +21,18 @@ class JellyfinItemEvent(BaseModel):
     Webhook payload sent by Jellyfin (e.g. on ItemAdded event).
     Supports standard Jellyfin webhook plugin schema variants.
     """
-    Event: Optional[str] = "ItemAdded"
-    NotificationType: Optional[str] = None
-    NotificationUsername: Optional[str] = None
-    ServerId: Optional[str] = None
-    ServerName: Optional[str] = None
-    ServerVersion: Optional[str] = None
-    ItemId: Optional[str] = None
-    ItemName: Optional[str] = None
-    ItemType: Optional[str] = None
-    ItemPath: Optional[str] = None
-    Item: Optional[JellyfinItem] = None
-    Timestamp: Optional[str] = None
+    Event: Optional[str] = Field(default="ItemAdded", validation_alias=AliasChoices("Event", "event", "NotificationType", "notification_type"))
+    NotificationType: Optional[str] = Field(default=None, validation_alias=AliasChoices("NotificationType", "notificationType", "notification_type"))
+    NotificationUsername: Optional[str] = Field(default=None, validation_alias=AliasChoices("NotificationUsername", "notificationUsername", "notification_username"))
+    ServerId: Optional[str] = Field(default=None, validation_alias=AliasChoices("ServerId", "serverId", "server_id"))
+    ServerName: Optional[str] = Field(default=None, validation_alias=AliasChoices("ServerName", "serverName", "server_name"))
+    ServerVersion: Optional[str] = Field(default=None, validation_alias=AliasChoices("ServerVersion", "serverVersion", "server_version"))
+    ItemId: Optional[str] = Field(default=None, validation_alias=AliasChoices("ItemId", "itemId", "item_id", "Id", "id"))
+    ItemName: Optional[str] = Field(default=None, validation_alias=AliasChoices("ItemName", "itemName", "item_name", "Name", "name"))
+    ItemType: Optional[str] = Field(default=None, validation_alias=AliasChoices("ItemType", "itemType", "item_type", "Type", "type"))
+    ItemPath: Optional[str] = Field(default=None, validation_alias=AliasChoices("ItemPath", "itemPath", "item_path", "Path", "path"))
+    Item: Optional[JellyfinItem] = Field(default=None, validation_alias=AliasChoices("Item", "item"))
+    Timestamp: Optional[str] = Field(default=None, validation_alias=AliasChoices("Timestamp", "timestamp"))
 
     def get_item_id(self) -> Optional[str]:
         if self.Item and self.Item.Id:
