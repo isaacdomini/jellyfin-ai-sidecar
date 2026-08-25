@@ -48,17 +48,8 @@ async def process_media_item_background(
                     chunk_size_seconds=settings.CHUNK_SIZE_SECONDS,
                     overlap_seconds=settings.CHUNK_OVERLAP_SECONDS
                 )
-                logger.info(f"Generated {len(raw_chunks)} chunks (lang='{detected_lang}', english={is_english}).")
-
-                # If subtitles are in a foreign language, translate to English
-                if not is_english and detected_lang not in ["eng", "en", "english"]:
-                    logger.info(f"Translating non-English ({detected_lang}) subtitles to English for '{item_name}'...")
-                    chunks = await llm_service.translate_chunks_to_english(
-                        raw_chunks,
-                        source_language=detected_lang
-                    )
-                else:
-                    chunks = raw_chunks
+                chunks = raw_chunks
+                logger.info(f"Ready to index {len(chunks)} chunks for '{item_name}' (lang='{detected_lang}').")
         except Exception as exc:
             logger.error(f"Failed to extract or chunk subtitles for item {item_id}: {exc}", exc_info=True)
 
