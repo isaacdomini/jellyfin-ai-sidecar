@@ -22,17 +22,22 @@ namespace Jellyfin.Plugin.AiSidecar.Api;
 public class AiSidecarController : ControllerBase
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpClientFactory? _httpClientFactory;
     private readonly ILogger<AiSidecarController> _logger;
 
     public AiSidecarController(
         ILibraryManager libraryManager,
-        IHttpClientFactory httpClientFactory,
-        ILogger<AiSidecarController> logger)
+        ILoggerFactory loggerFactory,
+        IHttpClientFactory? httpClientFactory = null)
     {
         _libraryManager = libraryManager;
         _httpClientFactory = httpClientFactory;
-        _logger = logger;
+        _logger = loggerFactory.CreateLogger<AiSidecarController>();
+    }
+
+    private HttpClient CreateHttpClient()
+    {
+        return _httpClientFactory?.CreateClient() ?? new HttpClient();
     }
 
     /// <summary>
@@ -52,7 +57,7 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
+            var httpClient = CreateHttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(5);
 
             string healthUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/health";
@@ -95,7 +100,7 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
+            var httpClient = CreateHttpClient();
             string searchUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/search";
 
             var jsonContent = new StringContent(
@@ -152,7 +157,7 @@ public class AiSidecarController : ControllerBase
             }
         };
 
-        var httpClient = _httpClientFactory.CreateClient();
+        var httpClient = CreateHttpClient();
         string endpoint = $"{config.SidecarServerUrl.TrimEnd('/')}/webhook/item-added";
 
         var jsonContent = new StringContent(
@@ -193,7 +198,7 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
+            var httpClient = CreateHttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(60);
 
             string ragUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/rag/query";
@@ -245,7 +250,7 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = _httpClientFactory.CreateClient();
+            var httpClient = CreateHttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(10);
 
             string providersUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/rag/providers";
@@ -274,7 +279,7 @@ public class AiSidecarController : ControllerBase
             return BadRequest(new { message = "AI Sidecar server URL is not configured." });
         }
 
-        var task = new Services.LibrarySyncTask(_libraryManager, _httpClientFactory, LoggerFactory.Create(b => {}).CreateLogger<Services.LibrarySyncTask>());
+        var task = new Services.LibrarySyncTask(_libraryManager, LoggerFactory.Create(b => {}), _httpClientFactory);
         _ = Task.Run(() => task.ExecuteAsync(new Progress<double>(), CancellationToken.None));
 
         return Ok(new { status = "started", message = "Library synchronization has been started in the background." });

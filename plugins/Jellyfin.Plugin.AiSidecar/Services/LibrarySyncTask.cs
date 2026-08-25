@@ -23,17 +23,22 @@ namespace Jellyfin.Plugin.AiSidecar.Services;
 public class LibrarySyncTask : IScheduledTask
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpClientFactory? _httpClientFactory;
     private readonly ILogger<LibrarySyncTask> _logger;
 
     public LibrarySyncTask(
         ILibraryManager libraryManager,
-        IHttpClientFactory httpClientFactory,
-        ILogger<LibrarySyncTask> logger)
+        ILoggerFactory loggerFactory,
+        IHttpClientFactory? httpClientFactory = null)
     {
         _libraryManager = libraryManager;
         _httpClientFactory = httpClientFactory;
-        _logger = logger;
+        _logger = loggerFactory.CreateLogger<LibrarySyncTask>();
+    }
+
+    private HttpClient CreateHttpClient()
+    {
+        return _httpClientFactory?.CreateClient() ?? new HttpClient();
     }
 
     public string Name => "Index Media for AI Sidecar";
@@ -86,7 +91,7 @@ public class LibrarySyncTask : IScheduledTask
 
         _logger.LogInformation("Found {Count} existing media items to index for AI Sidecar.", items.Count);
 
-        var httpClient = _httpClientFactory.CreateClient();
+        var httpClient = CreateHttpClient();
         httpClient.Timeout = TimeSpan.FromSeconds(30);
 
         if (!string.IsNullOrWhiteSpace(config.ApiKey))

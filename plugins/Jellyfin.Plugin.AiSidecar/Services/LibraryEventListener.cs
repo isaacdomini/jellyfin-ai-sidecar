@@ -19,17 +19,22 @@ namespace Jellyfin.Plugin.AiSidecar.Services;
 public class LibraryEventListener : IHostedService, IDisposable
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpClientFactory? _httpClientFactory;
     private readonly ILogger<LibraryEventListener> _logger;
 
     public LibraryEventListener(
         ILibraryManager libraryManager,
-        IHttpClientFactory httpClientFactory,
-        ILogger<LibraryEventListener> logger)
+        ILoggerFactory loggerFactory,
+        IHttpClientFactory? httpClientFactory = null)
     {
         _libraryManager = libraryManager;
         _httpClientFactory = httpClientFactory;
-        _logger = logger;
+        _logger = loggerFactory.CreateLogger<LibraryEventListener>();
+    }
+
+    private HttpClient CreateHttpClient()
+    {
+        return _httpClientFactory?.CreateClient() ?? new HttpClient();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -125,7 +130,7 @@ public class LibraryEventListener : IHostedService, IDisposable
                 "application/json"
             );
 
-            var httpClient = _httpClientFactory.CreateClient();
+            var httpClient = CreateHttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(15);
 
             if (!string.IsNullOrWhiteSpace(config.ApiKey))
