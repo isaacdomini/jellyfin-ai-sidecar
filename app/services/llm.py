@@ -24,8 +24,8 @@ PROVIDERS_INFO: Dict[str, Dict[str, Any]] = {
     },
     "gemini": {
         "name": "Google Gemini",
-        "default_model": "gemini-3.7-flash",
-        "available_models": ["gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest"],
+        "default_model": "gemini-3.6-flash",
+        "available_models": ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash"],
         "requires_api_key": True,
         "supports_base_url": False,
         "default_base_url": "https://generativelanguage.googleapis.com"
@@ -312,7 +312,7 @@ class LLMService:
             raise ValueError("Gemini API key is required. Please set LLM_API_KEY or configure it in the plugin settings.")
 
         fallback_models = [model]
-        for fallback in ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash"]:
+        for fallback in ["gemini-3.6-flash", "gemini-3.5-flash-lite"]:
             if fallback not in fallback_models:
                 fallback_models.append(fallback)
 
