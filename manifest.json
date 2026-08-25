@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "0.0.2.0",
-        "changelog": "Release version 0.0.2.0",
+        "version": "0.0.3.0",
+        "changelog": "Release version 0.0.3.0",
         "targetAbi": "10.8.0.0",
-        "sourceUrl": "https://github.com/isaacdomini/jellyfin-ai-sidecar/releases/download/plugin-v0.0.2/jellyfin-plugin-aisidecar-0.0.2.0.zip",
-        "checksum": "c5fba959d3c8e5180aab8a1f734b7a06",
-        "timestamp": "2026-08-25T19:12:43Z"
+        "sourceUrl": "https://github.com/isaacdomini/jellyfin-ai-sidecar/releases/download/plugin-v0.0.3/jellyfin-plugin-aisidecar-0.0.3.0.zip",
+        "checksum": "6046bc297b030008f5e0395d9514ba15",
+        "timestamp": "2026-08-25T19:21:58Z"
       }
     ]
   }
