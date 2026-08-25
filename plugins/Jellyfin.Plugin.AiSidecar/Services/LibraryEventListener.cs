@@ -19,29 +19,18 @@ namespace Jellyfin.Plugin.AiSidecar.Services;
 public class LibraryEventListener : IHostedService, IDisposable
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IHttpClientFactory? _httpClientFactory;
-    private readonly ILogger<LibraryEventListener> _logger;
+    private static readonly HttpClient _httpClient = new HttpClient();
 
-    public LibraryEventListener(
-        ILibraryManager libraryManager,
-        ILoggerFactory loggerFactory,
-        IHttpClientFactory? httpClientFactory = null)
+    public LibraryEventListener(ILibraryManager libraryManager)
     {
         _libraryManager = libraryManager;
-        _httpClientFactory = httpClientFactory;
-        _logger = loggerFactory.CreateLogger<LibraryEventListener>();
-    }
-
-    private HttpClient CreateHttpClient()
-    {
-        return _httpClientFactory?.CreateClient() ?? new HttpClient();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _libraryManager.ItemAdded += OnItemAdded;
         _libraryManager.ItemUpdated += OnItemUpdated;
-        _logger.LogInformation("AI Sidecar Library Event Listener initialized.");
+        Console.WriteLine("[LibraryEventListener] AI Sidecar Library Event Listener initialized.");
         return Task.CompletedTask;
     }
 
@@ -130,29 +119,30 @@ public class LibraryEventListener : IHostedService, IDisposable
                 "application/json"
             );
 
-            var httpClient = CreateHttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(15);
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            requestMessage.Content = jsonContent;
 
             if (!string.IsNullOrWhiteSpace(config.ApiKey))
             {
-                httpClient.DefaultRequestHeaders.Add("X-API-Key", config.ApiKey);
+                requestMessage.Headers.Add("X-API-Key", config.ApiKey);
             }
 
-            _logger.LogInformation("Notifying AI Sidecar of media event ({Event}): {Name} ({Path})", eventType, item.Name, item.Path);
-            var response = await httpClient.PostAsync(endpoint, jsonContent).ConfigureAwait(false);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            Console.WriteLine($"[LibraryEventListener] Notifying AI Sidecar of media event ({eventType}): {item.Name} ({item.Path})");
+            var response = await _httpClient.SendAsync(requestMessage, cts.Token).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("AI Sidecar accepted indexing for item: {Name}", item.Name);
+                Console.WriteLine($"[LibraryEventListener] AI Sidecar accepted indexing for item: {item.Name}");
             }
             else
             {
-                _logger.LogWarning("AI Sidecar responded with status {StatusCode} for item: {Name}", response.StatusCode, item.Name);
+                Console.WriteLine($"[LibraryEventListener] AI Sidecar responded with status {response.StatusCode} for item: {item.Name}");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send media event notification to AI Sidecar for item: {Name}", item.Name);
+            Console.WriteLine($"[LibraryEventListener] Failed to send media event notification to AI Sidecar for item: {item.Name} - {ex.Message}");
         }
     }
 

@@ -23,22 +23,11 @@ namespace Jellyfin.Plugin.AiSidecar.Services;
 public class LibrarySyncTask : IScheduledTask
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IHttpClientFactory? _httpClientFactory;
-    private readonly ILogger<LibrarySyncTask> _logger;
+    private static readonly HttpClient _httpClient = new HttpClient();
 
-    public LibrarySyncTask(
-        ILibraryManager libraryManager,
-        ILoggerFactory loggerFactory,
-        IHttpClientFactory? httpClientFactory = null)
+    public LibrarySyncTask(ILibraryManager libraryManager)
     {
         _libraryManager = libraryManager;
-        _httpClientFactory = httpClientFactory;
-        _logger = loggerFactory.CreateLogger<LibrarySyncTask>();
-    }
-
-    private HttpClient CreateHttpClient()
-    {
-        return _httpClientFactory?.CreateClient() ?? new HttpClient();
     }
 
     public string Name => "Index Media for AI Sidecar";
@@ -89,15 +78,7 @@ public class LibrarySyncTask : IScheduledTask
             return;
         }
 
-        _logger.LogInformation("Found {Count} existing media items to index for AI Sidecar.", items.Count);
-
-        var httpClient = CreateHttpClient();
-        httpClient.Timeout = TimeSpan.FromSeconds(30);
-
-        if (!string.IsNullOrWhiteSpace(config.ApiKey))
-        {
-            httpClient.DefaultRequestHeaders.Add("X-API-Key", config.ApiKey);
-        }
+        Console.WriteLine($"[LibrarySyncTask] Found {items.Count} existing media items to index for AI Sidecar.");
 
         string sidecarUrl = config.SidecarServerUrl.TrimEnd('/');
         string endpoint = $"{sidecarUrl}/webhook/item-added";
@@ -107,7 +88,7 @@ public class LibrarySyncTask : IScheduledTask
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                _logger.LogInformation("AI Sidecar library sync cancelled by user.");
+                Console.WriteLine("[LibrarySyncTask] AI Sidecar library sync cancelled by user.");
                 break;
             }
 
@@ -141,15 +122,23 @@ public class LibrarySyncTask : IScheduledTask
                     "application/json"
                 );
 
-                var response = await httpClient.PostAsync(endpoint, jsonContent, cancellationToken).ConfigureAwait(false);
+                using var requestMessage = new HttpRequestMessage(HttpMethod.Post, endpoint);
+                requestMessage.Content = jsonContent;
+
+                if (!string.IsNullOrWhiteSpace(config.ApiKey))
+                {
+                    requestMessage.Headers.Add("X-API-Key", config.ApiKey);
+                }
+
+                var response = await _httpClient.SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogDebug("Queued {Name} for indexing.", item.Name);
+                    // Queued
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send item {Name} to AI Sidecar during library sync", item.Name);
+                Console.WriteLine($"[LibrarySyncTask] Failed to send item {item.Name} to AI Sidecar: {ex.Message}");
             }
 
             processed++;
@@ -159,7 +148,7 @@ public class LibrarySyncTask : IScheduledTask
             await Task.Delay(50, cancellationToken).ConfigureAwait(false);
         }
 
-        _logger.LogInformation("AI Sidecar library sync completed: {Processed}/{Total} items processed.", processed, items.Count);
+        Console.WriteLine($"[LibrarySyncTask] AI Sidecar library sync completed: {processed}/{items.Count} items processed.");
         progress.Report(100.0);
     }
 }

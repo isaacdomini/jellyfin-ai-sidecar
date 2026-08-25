@@ -22,22 +22,25 @@ namespace Jellyfin.Plugin.AiSidecar.Api;
 public class AiSidecarController : ControllerBase
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly IHttpClientFactory? _httpClientFactory;
-    private readonly ILogger<AiSidecarController> _logger;
+    private static readonly HttpClient _httpClient = new HttpClient();
 
-    public AiSidecarController(
-        ILibraryManager libraryManager,
-        ILoggerFactory loggerFactory,
-        IHttpClientFactory? httpClientFactory = null)
+    public AiSidecarController(ILibraryManager libraryManager)
     {
         _libraryManager = libraryManager;
-        _httpClientFactory = httpClientFactory;
-        _logger = loggerFactory.CreateLogger<AiSidecarController>();
     }
 
-    private HttpClient CreateHttpClient()
+    private void LogError(Exception ex, string message)
     {
-        return _httpClientFactory?.CreateClient() ?? new HttpClient();
+        try
+        {
+            var loggerFactory = HttpContext?.RequestServices?.GetService(typeof(ILoggerFactory)) as ILoggerFactory;
+            var logger = loggerFactory?.CreateLogger<AiSidecarController>();
+            logger?.LogError(ex, "{Message}", message);
+        }
+        catch
+        {
+            Console.WriteLine($"[AiSidecarController] ERROR: {message} - {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -57,11 +60,9 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = CreateHttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
-
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
             string healthUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/health";
-            var response = await httpClient.GetAsync(healthUrl);
+            var response = await _httpClient.GetAsync(healthUrl, cts.Token);
 
             if (response.IsSuccessStatusCode)
             {
@@ -73,7 +74,7 @@ public class AiSidecarController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to connect to AI Sidecar service");
+            LogError(ex, "Failed to connect to AI Sidecar service");
             return StatusCode(StatusCodes.Status502BadGateway, new { status = "disconnected", error = ex.Message });
         }
     }
@@ -100,7 +101,6 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = CreateHttpClient();
             string searchUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/search";
 
             var jsonContent = new StringContent(
@@ -109,14 +109,14 @@ public class AiSidecarController : ControllerBase
                 "application/json"
             );
 
-            var response = await httpClient.PostAsync(searchUrl, jsonContent);
+            var response = await _httpClient.PostAsync(searchUrl, jsonContent);
             var resultString = await response.Content.ReadAsStringAsync();
 
             return Content(resultString, MediaTypeNames.Application.Json);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while executing search on AI Sidecar");
+            LogError(ex, "Error while executing search on AI Sidecar");
             return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message });
         }
     }
@@ -157,7 +157,6 @@ public class AiSidecarController : ControllerBase
             }
         };
 
-        var httpClient = CreateHttpClient();
         string endpoint = $"{config.SidecarServerUrl.TrimEnd('/')}/webhook/item-added";
 
         var jsonContent = new StringContent(
@@ -166,7 +165,7 @@ public class AiSidecarController : ControllerBase
             "application/json"
         );
 
-        var response = await httpClient.PostAsync(endpoint, jsonContent);
+        var response = await _httpClient.PostAsync(endpoint, jsonContent);
         if (response.IsSuccessStatusCode)
         {
             return Ok(new { status = "success", message = $"Indexing task queued for {item.Name}." });
@@ -198,9 +197,7 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = CreateHttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(60);
-
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(60));
             string ragUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/rag/query";
 
             // Fallback to plugin configuration if request didn't override provider settings
@@ -222,14 +219,14 @@ public class AiSidecarController : ControllerBase
                 "application/json"
             );
 
-            var response = await httpClient.PostAsync(ragUrl, jsonContent);
+            var response = await _httpClient.PostAsync(ragUrl, jsonContent, cts.Token);
             var resultString = await response.Content.ReadAsStringAsync();
 
             return Content(resultString, MediaTypeNames.Application.Json);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while executing RAG query on AI Sidecar");
+            LogError(ex, "Error while executing RAG query on AI Sidecar");
             return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message });
         }
     }
@@ -250,18 +247,16 @@ public class AiSidecarController : ControllerBase
 
         try
         {
-            var httpClient = CreateHttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(10);
-
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
             string providersUrl = $"{config.SidecarServerUrl.TrimEnd('/')}/rag/providers";
-            var response = await httpClient.GetAsync(providersUrl);
+            var response = await _httpClient.GetAsync(providersUrl, cts.Token);
             var resultString = await response.Content.ReadAsStringAsync();
 
             return Content(resultString, MediaTypeNames.Application.Json);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve LLM providers from AI Sidecar");
+            LogError(ex, "Failed to retrieve LLM providers from AI Sidecar");
             return StatusCode(StatusCodes.Status502BadGateway, new { error = ex.Message });
         }
     }
@@ -279,7 +274,7 @@ public class AiSidecarController : ControllerBase
             return BadRequest(new { message = "AI Sidecar server URL is not configured." });
         }
 
-        var task = new Services.LibrarySyncTask(_libraryManager, LoggerFactory.Create(b => {}), _httpClientFactory);
+        var task = new Services.LibrarySyncTask(_libraryManager);
         _ = Task.Run(() => task.ExecuteAsync(new Progress<double>(), CancellationToken.None));
 
         return Ok(new { status = "started", message = "Library synchronization has been started in the background." });
