@@ -43,16 +43,6 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         }
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _eventListener?.Dispose();
-        }
-
-        base.Dispose(disposing);
-    }
-
     /// <summary>
     /// Automatically injects the AI Sidecar client script tag into Jellyfin Web's index.html
     /// so that the floating search button is available to all users without manual web edits.
