@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 using Jellyfin.Plugin.AiSidecar.Configuration;
+using Jellyfin.Plugin.AiSidecar.Services;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 
@@ -22,11 +25,32 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public static Plugin? Instance { get; private set; }
 
-    public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
+    private readonly LibraryEventListener? _eventListener;
+
+    public Plugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer, ILibraryManager libraryManager)
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
         TryInjectClientScript(applicationPaths);
+        try
+        {
+            _eventListener = new LibraryEventListener(libraryManager);
+            _ = _eventListener.StartAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AiSidecar] Warning: Could not initialize LibraryEventListener: {ex.Message}");
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _eventListener?.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     /// <summary>
