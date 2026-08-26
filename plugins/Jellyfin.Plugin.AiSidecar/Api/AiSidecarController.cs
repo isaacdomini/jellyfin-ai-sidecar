@@ -126,7 +126,7 @@ public class AiSidecarController : ControllerBase
     /// Manually triggers indexing for a specific Jellyfin library item.
     /// </summary>
     [HttpPost("IndexItem/{itemId}")]
-    [Authorize(Policy = "RequiresElevation")]
+    [Authorize]
     public async Task<ActionResult> IndexItem([FromRoute] Guid itemId)
     {
         var item = _libraryManager.GetItemById(itemId);

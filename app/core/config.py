@@ -104,6 +104,10 @@ class Settings(BaseSettings):
         default=15,
         validation_alias=AliasChoices("AI_SIDECAR_RAG_TOP_K", "RAG_TOP_K")
     )
+    LLM_TIMEOUT: float = Field(
+        default=60.0,
+        validation_alias=AliasChoices("AI_SIDECAR_LLM_TIMEOUT", "LLM_TIMEOUT")
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

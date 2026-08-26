@@ -231,13 +231,46 @@
     function renderContextBadge() {
         var badge = document.getElementById('ai-context-badge');
         if (currentContext && currentContext.scoped && currentContext.id) {
-            badge.innerHTML = `🎯 <b>Scoped to:</b> ${currentContext.name} <span style="opacity:0.75; font-size:0.85em;">(${currentContext.type})</span> <a href="#" id="ai-toggle-scope" style="color:#00A4DC; margin-left:8px; text-decoration:underline; font-size:0.85em;">(Switch to Global)</a>`;
+            badge.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                    <div>🎯 <b>Scoped to:</b> ${currentContext.name} <span style="opacity:0.75; font-size:0.85em;">(${currentContext.type})</span></div>
+                    <div style="display:flex; gap:10px; font-size:0.85em;">
+                        <a href="#" id="ai-reindex-btn" style="color:#FFC107; text-decoration:underline;">⚡ Sync/Re-Index</a>
+                        <a href="#" id="ai-toggle-scope" style="color:#00A4DC; text-decoration:underline;">Switch to Global</a>
+                    </div>
+                </div>
+            `;
+
             var toggle = document.getElementById('ai-toggle-scope');
             if (toggle) {
                 toggle.onclick = function(e) {
                     e.preventDefault();
                     currentContext.scoped = false;
                     renderContextBadge();
+                };
+            }
+
+            var reindex = document.getElementById('ai-reindex-btn');
+            if (reindex) {
+                reindex.onclick = async function(e) {
+                    e.preventDefault();
+                    reindex.textContent = "⏳ Syncing...";
+                    try {
+                        var targetId = (currentContext.ids && currentContext.ids.length > 0) ? currentContext.ids[0] : currentContext.id;
+                        var res = await ApiClient.fetch({
+                            url: ApiClient.getUrl('/Plugins/AiSidecar/IndexItem/' + targetId),
+                            type: 'POST'
+                        });
+                        if (res.ok) {
+                            reindex.textContent = "✅ Queued!";
+                            setTimeout(function() { renderContextBadge(); }, 3000);
+                        } else {
+                            reindex.textContent = "⚠️ Error";
+                        }
+                    } catch (err) {
+                        console.error("[AI Sidecar] Manual sync error:", err);
+                        reindex.textContent = "⚠️ Failed";
+                    }
                 };
             }
         } else {

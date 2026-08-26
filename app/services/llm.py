@@ -152,8 +152,9 @@ class LLMService:
     Multi-provider LLM service supporting OpenAI, Gemini, Claude, Groq, Ollama, and custom endpoints.
     """
 
-    def __init__(self, timeout: float = 45.0):
-        self.timeout = timeout
+    def __init__(self, timeout: Optional[float] = None):
+        t_sec = timeout or settings.LLM_TIMEOUT or 60.0
+        self.timeout = httpx.Timeout(t_sec, connect=15.0, read=t_sec)
 
     @staticmethod
     def get_providers_info() -> List[ProviderModelInfo]:
@@ -163,38 +164,36 @@ class LLMService:
         return [
             ProviderModelInfo(
                 id=pid,
-                name=p["name"],
-                default_model=p["default_model"],
-                available_models=p["available_models"],
-                requires_api_key=p["requires_api_key"],
-                supports_base_url=p["supports_base_url"]
+                name=info["name"],
+                default_model=info["default_model"],
+                available_models=info["available_models"],
+                requires_api_key=info["requires_api_key"],
+                supports_base_url=info["supports_base_url"],
+                default_base_url=info["default_base_url"]
             )
-            for pid, p in PROVIDERS_INFO.items()
+            for pid, info in PROVIDERS_INFO.items()
         ]
 
     def resolve_provider_config(
         self,
-        provider: Optional[str] = None,
-        api_key: Optional[str] = None,
-        model: Optional[str] = None,
-        base_url: Optional[str] = None,
-        temperature: Optional[float] = None
+        override_provider: Optional[str] = None,
+        override_api_key: Optional[str] = None,
+        override_model: Optional[str] = None,
+        override_base_url: Optional[str] = None,
+        override_temperature: Optional[float] = None
     ) -> Tuple[str, Optional[str], str, Optional[str], float]:
         """
-        Resolves provider, API key, model, base URL, and temperature from request overrides or settings.
+        Resolves the active provider, API key, model, base URL, and temperature from defaults or per-request overrides.
         """
-        prov = (provider or settings.LLM_PROVIDER or "openai").lower().strip()
-        if prov not in PROVIDERS_INFO and prov not in ["mock", "none"]:
-            prov = "custom"
+        provider = (override_provider or settings.LLM_PROVIDER or "gemini").lower().strip()
+        provider_info = PROVIDERS_INFO.get(provider, PROVIDERS_INFO["gemini"])
 
-        prov_meta = PROVIDERS_INFO.get(prov, {})
+        api_key = override_api_key or settings.LLM_API_KEY
+        model = override_model or settings.LLM_MODEL or provider_info["default_model"]
+        base_url = override_base_url or settings.LLM_BASE_URL or provider_info["default_base_url"]
+        temperature = override_temperature if override_temperature is not None else settings.LLM_TEMPERATURE
 
-        key = api_key if api_key is not None else settings.LLM_API_KEY
-        m = model if model else (settings.LLM_MODEL or prov_meta.get("default_model", "default-model"))
-        b_url = base_url if base_url else (settings.LLM_BASE_URL or prov_meta.get("default_base_url"))
-        temp = temperature if temperature is not None else settings.LLM_TEMPERATURE
-
-        return prov, key, m, b_url, temp
+        return provider, api_key, model, base_url, temperature
 
     async def generate_rag_response(
         self,
@@ -207,11 +206,18 @@ class LLMService:
         temperature: Optional[float] = None
     ) -> RagQueryResponse:
         """
-        Runs RAG generation: formats context, prompts LLM, and formats citations with timestamp deep-links.
+        Generates a contextual, synthesized answer based on retrieved dialogue chunks.
         """
         prov, key, m, b_url, temp = self.resolve_provider_config(
             provider, api_key, model, base_url, temperature
         )
+
+        if not retrieved_chunks:
+            return RagQueryResponse(
+                query=query,
+                answer=f"I couldn't find any dialogue in your media library relating to \"{query}\".",
+                citations=[]
+            )
 
         context_str = format_context_chunks(retrieved_chunks)
         system_prompt = build_rag_system_prompt()
@@ -254,13 +260,13 @@ class LLMService:
                 RagCitation(
                     item_id=chunk.item_id,
                     item_name=chunk.item_name,
+                    text=chunk.text,
                     start_time=chunk.start_time,
                     end_time=chunk.end_time,
-                    timestamp_formatted=ts_formatted,
                     start_ticks=ticks,
-                    deep_link=deep_link,
-                    text=chunk.text,
-                    score=chunk.score
+                    timestamp_formatted=ts_formatted,
+                    score=chunk.score,
+                    deep_link=deep_link
                 )
             )
 
@@ -279,18 +285,17 @@ class LLMService:
         user_prompt: str,
         api_key: Optional[str],
         model: str,
-        base_url: Optional[str],
+        base_url: str,
         temperature: float,
-        provider_name: str
+        provider_name: str = "openai"
     ) -> str:
         """
-        Handles OpenAI, Groq, Ollama /v1, and any OpenAI-compatible completions API.
+        Calls any OpenAI-compatible chat completions API (OpenAI, Groq, Ollama, vLLM, LMStudio).
         """
-        if not api_key and provider_name not in ["ollama", "custom", "mock"]:
-            return self._generate_mock_rag_answer(user_prompt, [])
-
-        endpoint = f"{base_url.rstrip('/')}/chat/completions" if base_url else "https://api.openai.com/v1/chat/completions"
-        headers = {"Content-Type": "application/json"}
+        endpoint = f"{base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Content-Type": "application/json"
+        }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
@@ -304,11 +309,26 @@ class LLMService:
             "max_tokens": settings.LLM_MAX_TOKENS
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(endpoint, json=payload, headers=headers)
+                    response.raise_for_status()
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"].strip()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code in [503, 429] and attempt == 0:
+                    import asyncio
+                    await asyncio.sleep(2.0)
+                    continue
+                raise e
+            except httpx.TimeoutException as e:
+                if attempt == 0:
+                    import asyncio
+                    logger.warning(f"Timeout calling {provider_name}. Retrying once...")
+                    await asyncio.sleep(1.0)
+                    continue
+                raise e
 
     async def _call_gemini(
         self,
@@ -324,7 +344,7 @@ class LLMService:
         if not api_key:
             raise ValueError("Gemini API key is required. Please set LLM_API_KEY or configure it in the plugin settings.")
 
-        target_model = (model or "gemini-3.7-flash").strip()
+        target_model = (model or "gemini-3.1-flash-lite").strip()
 
         headers = {
             "x-goog-api-key": api_key,
@@ -367,6 +387,13 @@ class LLMService:
                     await asyncio.sleep(2.0)
                     continue
                 raise e
+            except httpx.TimeoutException as e:
+                if attempt == 0:
+                    import asyncio
+                    logger.warning(f"Gemini timed out ({e}). Retrying once...")
+                    await asyncio.sleep(1.5)
+                    continue
+                raise e
             except Exception as e:
                 raise e
 
@@ -402,12 +429,27 @@ class LLMService:
             "max_tokens": settings.LLM_MAX_TOKENS
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            content = data.get("content", [])
-            return "".join(c.get("text", "") for c in content if c.get("type") == "text").strip()
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(endpoint, json=payload, headers=headers)
+                    response.raise_for_status()
+                    data = response.json()
+                    content = data.get("content", [])
+                    return "".join(c.get("text", "") for c in content if c.get("type") == "text").strip()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code in [503, 429] and attempt == 0:
+                    import asyncio
+                    await asyncio.sleep(2.0)
+                    continue
+                raise e
+            except httpx.TimeoutException as e:
+                if attempt == 0:
+                    import asyncio
+                    logger.warning(f"Anthropic timed out ({e}). Retrying once...")
+                    await asyncio.sleep(1.5)
+                    continue
+                raise e
 
     async def translate_text_to_english(
         self,
