@@ -131,8 +131,22 @@ Movies and episodes can be indexed in three ways:
    - **Item Types**: `Movie`, `Episode`
    - **Send All Properties**: Checked (`true`)
 
-### 2. Automatic: Native Jellyfin C# Plugin
-Use the custom C# plugin located in [`plugins/Jellyfin.Plugin.AiSidecar`](./plugins/Jellyfin.Plugin.AiSidecar) which listens directly to internal Jellyfin library events and provides a dashboard interface.
+### 2. Automatic: Native Jellyfin C# Plugin & Web Client Widget
+Use the custom C# plugin located in [`plugins/Jellyfin.Plugin.AiSidecar`](./plugins/Jellyfin.Plugin.AiSidecar) which listens directly to internal Jellyfin library events and provides an admin dashboard interface.
+
+#### 🌐 Enabling Floating AI Search for All Web Users (Non-Admins)
+The plugin serves a bundled, version-controlled client script (`/Plugins/AiSidecar/ClientScript`) providing a context-aware **"✨ Ask AI Scene"** floating button:
+- **Active Video Playback**: Automatically scopes queries to the currently playing movie or episode and seeks inside the player.
+- **Details Pages**: Scopes queries to the active Movie, Series, Season, or Episode.
+- **Library / Home**: Defaults to searching the entire library.
+
+To enable it for all users on your server:
+1. In Jellyfin, go to **Dashboard** ➔ **General**.
+2. In the **Custom JavaScript code** box, add:
+   ```html
+   <script src="/Plugins/AiSidecar/ClientScript"></script>
+   ```
+3. Click **Save**. Any future plugin updates automatically update the script without needing to touch this setting again.
 
 ### 3. Manual / API Direct Ingestion
 You can manually trigger indexing for any media item or `.srt` file using `curl`:

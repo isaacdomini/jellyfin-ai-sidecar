@@ -279,6 +279,27 @@ public class AiSidecarController : ControllerBase
 
         return Ok(new { status = "started", message = "Library synchronization has been started in the background." });
     }
+
+    /// <summary>
+    /// Serves the client-side JavaScript injection for the Jellyfin Web UI.
+    /// Accessible by all users to enable floating context-aware AI scene search.
+    /// </summary>
+    [HttpGet("ClientScript")]
+    [HttpGet("script.js")]
+    [AllowAnonymous]
+    [Produces("application/javascript")]
+    public ActionResult GetClientScript()
+    {
+        var assembly = typeof(Plugin).Assembly;
+        var resourceName = "Jellyfin.Plugin.AiSidecar.Web.sidecar.js";
+        var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream == null)
+        {
+            return NotFound("Client script resource not found.");
+        }
+
+        return File(stream, "application/javascript");
+    }
 }
 
 public class SearchRequest

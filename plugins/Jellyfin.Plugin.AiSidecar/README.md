@@ -9,15 +9,16 @@ A native Jellyfin server plugin that automatically notifies the **Jellyfin AI Si
 - **Automatic Event Dispatch**: Listens to Jellyfin's internal `ILibraryManager.ItemAdded` events and forwards media metadata directly to the Sidecar without requiring manual webhook configuration.
 - **Admin Dashboard Settings**: Configure Sidecar URL, authentication, and indexing preferences directly inside Jellyfin Server Dashboard under **Plugins** ➔ **AI Sidecar**.
 - **Connection Diagnostics**: Built-in "Test Connection" button to verify communication with the AI Sidecar.
-- **Jellyfin API Extensions**: Exposes `/Plugins/AiSidecar/Search` and `/Plugins/AiSidecar/IndexItem/{id}` for clients and scripts.
+- **Jellyfin API Extensions**: Exposes `/Plugins/AiSidecar/Search`, `/Plugins/AiSidecar/Rag`, and `/Plugins/AiSidecar/ClientScript` for clients and scripts.
+- **Client-Side Floating Search Widget**: Bundles a context-aware floating button (`✨ Ask AI Scene`) and modal for all web users (admin & non-admin).
 
 ---
 
 ## 🛠️ Build & Installation
 
 ### Prerequisites
-- [.NET 7.0 or .NET 8.0 SDK](https://dotnet.microsoft.com/download)
-- Jellyfin Media Server 10.8+ or 10.9+
+- [.NET 8.0 or .NET 9.0 SDK](https://dotnet.microsoft.com/download)
+- Jellyfin Media Server 10.9+ or 10.11+
 
 ### 1. Build the Plugin
 
@@ -50,3 +51,23 @@ dotnet publish -c Release -o ./publish
 3. Set **Sidecar Server URL** to your running FastAPI sidecar (e.g. `http://ai-sidecar:8000` in Docker networks, or `http://localhost:8000`).
 4. Click **Test Connection** to ensure the green checkmark appears.
 5. Click **Save Settings**.
+
+---
+
+## 🌐 Enabling Floating AI Search for All Users (Non-Admins)
+
+The plugin bundles a version-controlled client script (`sidecar.js`) that provides a floating **"✨ Ask AI Scene"** button and search modal:
+- **Active Video Playback**: Automatically scopes questions to the currently playing movie/episode and seeks inside the player when a scene is clicked.
+- **Details Pages**: Scopes questions to the active Movie, Series, Season, or Episode.
+- **Library / Home**: Defaults to a global search across all indexed media.
+
+To enable it for all users on your Jellyfin instance:
+
+1. In Jellyfin, go to **Dashboard** ➔ **General**.
+2. Scroll down to **Custom JavaScript code** and add this single line:
+   ```html
+   <script src="/Plugins/AiSidecar/ClientScript"></script>
+   ```
+3. Click **Save**.
+
+Whenever the plugin is updated, the client script updates automatically without needing to edit the custom JavaScript box again.
