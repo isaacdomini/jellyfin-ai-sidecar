@@ -26,6 +26,52 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        TryInjectClientScript(applicationPaths);
+    }
+
+    /// <summary>
+    /// Automatically injects the AI Sidecar client script tag into Jellyfin Web's index.html
+    /// so that the floating search button is available to all users without manual web edits.
+    /// </summary>
+    private void TryInjectClientScript(IApplicationPaths applicationPaths)
+    {
+        try
+        {
+            var webPath = applicationPaths.WebPath;
+            if (string.IsNullOrWhiteSpace(webPath))
+            {
+                return;
+            }
+
+            var indexPath = System.IO.Path.Combine(webPath, "index.html");
+            if (!System.IO.File.Exists(indexPath))
+            {
+                return;
+            }
+
+            var content = System.IO.File.ReadAllText(indexPath);
+            const string scriptTag = "<script src=\"/Plugins/AiSidecar/ClientScript\" defer></script>";
+
+            if (!content.Contains("/Plugins/AiSidecar/ClientScript", StringComparison.OrdinalIgnoreCase))
+            {
+                string updated;
+                if (content.Contains("</body>", StringComparison.OrdinalIgnoreCase))
+                {
+                    updated = content.Replace("</body>", $"{scriptTag}\n</body>", StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    updated = content + "\n" + scriptTag;
+                }
+
+                System.IO.File.WriteAllText(indexPath, updated);
+                Console.WriteLine("[AiSidecar] Successfully injected client script tag into Jellyfin Web index.html");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AiSidecar] Notice: Could not auto-inject into index.html: {ex.Message}");
+        }
     }
 
     public IEnumerable<PluginPageInfo> GetPages()

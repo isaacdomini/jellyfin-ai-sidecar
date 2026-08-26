@@ -54,20 +54,14 @@ dotnet publish -c Release -o ./publish
 
 ---
 
-## 🌐 Enabling Floating AI Search for All Users (Non-Admins)
+## 🌐 Floating AI Search for All Users (Non-Admins)
 
 The plugin bundles a version-controlled client script (`sidecar.js`) that provides a floating **"✨ Ask AI Scene"** button and search modal:
 - **Active Video Playback**: Automatically scopes questions to the currently playing movie/episode and seeks inside the player when a scene is clicked.
 - **Details Pages**: Scopes questions to the active Movie, Series, Season, or Episode.
 - **Library / Home**: Defaults to a global search across all indexed media.
 
-To enable it for all users on your Jellyfin instance:
+### Automatic Injection:
+On Jellyfin server startup, the plugin automatically checks Jellyfin Web's `index.html` and injects the client script reference (`<script src="/Plugins/AiSidecar/ClientScript" defer></script>`).
 
-1. In Jellyfin, go to **Dashboard** ➔ **General**.
-2. Scroll down to **Custom JavaScript code** and add this single line:
-   ```html
-   <script src="/Plugins/AiSidecar/ClientScript"></script>
-   ```
-3. Click **Save**.
-
-Whenever the plugin is updated, the client script updates automatically without needing to edit the custom JavaScript box again.
+**No manual UI configuration is needed.** Once you install the plugin and restart Jellyfin, the floating search button appears automatically for all users.
