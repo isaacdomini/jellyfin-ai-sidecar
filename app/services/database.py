@@ -210,6 +210,48 @@ def search_similar_chunks(
             if len(formatted_results) >= top_k:
                 break
 
+        # 3. If scoped to specific item(s), include plot summary and chronological narrative context
+        if filter_ids:
+            # Check for plot summary chunk
+            summary_stmt = select(SubtitleChunk).where(
+                SubtitleChunk.item_id.in_(filter_ids),
+                SubtitleChunk.chunk_text.ilike("Plot Summary:%")
+            ).limit(2)
+            summary_chunks = session.execute(summary_stmt).scalars().all()
+            for sc in summary_chunks:
+                if sc.id not in seen_ids:
+                    seen_ids.add(sc.id)
+                    formatted_results.insert(0, {
+                        "id": sc.id,
+                        "item_id": sc.item_id,
+                        "item_name": sc.item_name,
+                        "text": sc.chunk_text,
+                        "start_time": sc.start_time,
+                        "end_time": sc.end_time,
+                        "score": 1.0
+                    })
+
+            # If results are sparse (e.g. for high-level "summarize" queries), pull chronological dialogue chunks
+            if len(formatted_results) < top_k:
+                chron_stmt = select(SubtitleChunk).where(
+                    SubtitleChunk.item_id.in_(filter_ids)
+                ).order_by(SubtitleChunk.start_time.asc()).limit(top_k)
+                chron_chunks = session.execute(chron_stmt).scalars().all()
+                for cc in chron_chunks:
+                    if cc.id not in seen_ids:
+                        seen_ids.add(cc.id)
+                        formatted_results.append({
+                            "id": cc.id,
+                            "item_id": cc.item_id,
+                            "item_name": cc.item_name,
+                            "text": cc.chunk_text,
+                            "start_time": cc.start_time,
+                            "end_time": cc.end_time,
+                            "score": 0.85
+                        })
+                    if len(formatted_results) >= top_k:
+                        break
+
         return formatted_results[:top_k]
     finally:
         session.close()
