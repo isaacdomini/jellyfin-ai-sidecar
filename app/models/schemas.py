@@ -112,8 +112,8 @@ class RagCitation(BaseModel):
 class RagQueryResponse(BaseModel):
     query: str
     answer: str
-    provider_used: str
-    model_used: str
+    provider_used: str = "gemini"
+    model_used: str = "gemini-3.5-flash-lite"
     citations: List[RagCitation] = Field(default_factory=list, description="Citations referenced with playback deep-links")
     sources: List[SearchResultItem] = Field(default_factory=list, description="Retrieved vector DB context chunks")
 

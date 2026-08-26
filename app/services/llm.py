@@ -216,7 +216,10 @@ class LLMService:
             return RagQueryResponse(
                 query=query,
                 answer=f"I couldn't find any dialogue in your media library relating to \"{query}\".",
-                citations=[]
+                provider_used=prov,
+                model_used=m,
+                citations=[],
+                sources=[]
             )
 
         context_str = format_context_chunks(retrieved_chunks)
