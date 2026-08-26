@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
@@ -304,19 +305,57 @@ public class AiSidecarController : ControllerBase
 
 public class SearchRequest
 {
+    [JsonPropertyName("query")]
     public string Query { get; set; } = string.Empty;
+
+    [JsonPropertyName("top_k")]
     public int TopK { get; set; } = 5;
+
+    [JsonPropertyName("topK")]
+    public int? TopKCamel { set { if (value.HasValue) TopK = value.Value; } }
+
+    [JsonPropertyName("item_id")]
     public string? ItemId { get; set; }
+
+    [JsonPropertyName("itemId")]
+    public string? ItemIdCamel { set { if (!string.IsNullOrWhiteSpace(value)) ItemId = value; } }
 }
 
 public class RagRequestDto
 {
+    [JsonPropertyName("query")]
     public string Query { get; set; } = string.Empty;
+
+    [JsonPropertyName("item_id")]
     public string? ItemId { get; set; }
+
+    [JsonPropertyName("itemId")]
+    public string? ItemIdCamel { set { if (!string.IsNullOrWhiteSpace(value)) ItemId = value; } }
+
+    [JsonPropertyName("top_k")]
     public int? TopK { get; set; }
+
+    [JsonPropertyName("topK")]
+    public int? TopKCamel { set { if (value.HasValue) TopK = value; } }
+
+    [JsonPropertyName("provider")]
     public string? Provider { get; set; }
+
+    [JsonPropertyName("api_key")]
     public string? ApiKey { get; set; }
+
+    [JsonPropertyName("apiKey")]
+    public string? ApiKeyCamel { set { if (!string.IsNullOrWhiteSpace(value)) ApiKey = value; } }
+
+    [JsonPropertyName("model")]
     public string? Model { get; set; }
+
+    [JsonPropertyName("base_url")]
     public string? BaseUrl { get; set; }
+
+    [JsonPropertyName("baseUrl")]
+    public string? BaseUrlCamel { set { if (!string.IsNullOrWhiteSpace(value)) BaseUrl = value; } }
+
+    [JsonPropertyName("temperature")]
     public double? Temperature { get; set; }
 }

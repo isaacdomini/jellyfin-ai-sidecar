@@ -172,9 +172,11 @@
                 }
                 return {
                     id: item.Id,
+                    ids: [item.Id],
                     name: title,
                     type: item.Type || 'Video',
-                    isPlaying: true
+                    isPlaying: true,
+                    scoped: true
                 };
             }
         }
@@ -187,11 +189,32 @@
                 var userId = ApiClient.getCurrentUserId();
                 var itemDetails = await ApiClient.getItem(userId, match[1]);
                 if (itemDetails) {
+                    var ids = [itemDetails.Id];
+
+                    // If viewing a Series or Season, resolve all child episodes for comprehensive scoping
+                    if (itemDetails.Type === 'Series' || itemDetails.Type === 'Season') {
+                        try {
+                            var epRes = await ApiClient.getItems(userId, {
+                                parentId: itemDetails.Id,
+                                includeItemTypes: 'Episode',
+                                recursive: true,
+                                fields: 'Id'
+                            });
+                            if (epRes && epRes.Items && epRes.Items.length > 0) {
+                                ids = epRes.Items.map(function(e) { return e.Id; });
+                            }
+                        } catch (epErr) {
+                            console.warn("[AI Sidecar] Failed to fetch episodes for series/season:", epErr);
+                        }
+                    }
+
                     return {
                         id: itemDetails.Id,
+                        ids: ids,
                         name: itemDetails.Name,
                         type: itemDetails.Type || 'Item',
-                        isPlaying: false
+                        isPlaying: false,
+                        scoped: true
                     };
                 }
             } catch (e) {
@@ -200,20 +223,40 @@
         }
 
         // Context C: Default global search
-        return { id: null, name: "Entire Library", type: "Global", isPlaying: false };
+        return { id: null, ids: [], name: "Entire Library", type: "Global", isPlaying: false, scoped: false };
     }
 
     var currentContext = null;
 
+    function renderContextBadge() {
+        var badge = document.getElementById('ai-context-badge');
+        if (currentContext && currentContext.scoped && currentContext.id) {
+            badge.innerHTML = `🎯 <b>Scoped to:</b> ${currentContext.name} <span style="opacity:0.75; font-size:0.85em;">(${currentContext.type})</span> <a href="#" id="ai-toggle-scope" style="color:#00A4DC; margin-left:8px; text-decoration:underline; font-size:0.85em;">(Switch to Global)</a>`;
+            var toggle = document.getElementById('ai-toggle-scope');
+            if (toggle) {
+                toggle.onclick = function(e) {
+                    e.preventDefault();
+                    currentContext.scoped = false;
+                    renderContextBadge();
+                };
+            }
+        } else {
+            badge.innerHTML = `🌐 <b>Scope:</b> Entire Media Library` + (currentContext && currentContext.id ? ` <a href="#" id="ai-toggle-scope" style="color:#00A4DC; margin-left:8px; text-decoration:underline; font-size:0.85em;">(Re-scope to ${currentContext.name})</a>` : '');
+            var toggle = document.getElementById('ai-toggle-scope');
+            if (toggle) {
+                toggle.onclick = function(e) {
+                    e.preventDefault();
+                    currentContext.scoped = true;
+                    renderContextBadge();
+                };
+            }
+        }
+    }
+
     // 5. Open Modal & Refresh Context
     fab.onclick = async function () {
         currentContext = await getCurrentMediaContext();
-        var badge = document.getElementById('ai-context-badge');
-        if (currentContext.id) {
-            badge.innerHTML = `🎯 <b>Scoped to:</b> ${currentContext.name} <span style="opacity:0.75; font-size:0.85em;">(${currentContext.type})</span>`;
-        } else {
-            badge.innerHTML = `🌐 <b>Scope:</b> Entire Media Library`;
-        }
+        renderContextBadge();
 
         overlay.style.display = 'flex';
         document.getElementById('ai-query-input').focus();
@@ -251,14 +294,25 @@
         answerBox.style.display = 'none';
         citBox.innerHTML = '';
 
+        var filterId = null;
+        if (currentContext && currentContext.scoped) {
+            if (currentContext.ids && currentContext.ids.length > 0) {
+                filterId = currentContext.ids.join(',');
+            } else if (currentContext.id) {
+                filterId = currentContext.id;
+            }
+        }
+
         try {
             var response = await ApiClient.fetch({
                 url: ApiClient.getUrl('/Plugins/AiSidecar/Rag'),
                 type: 'POST',
                 data: JSON.stringify({
                     query: query,
-                    item_id: currentContext ? currentContext.id : null,
-                    top_k: 5
+                    item_id: filterId,
+                    itemId: filterId,
+                    top_k: 5,
+                    topK: 5
                 }),
                 contentType: 'application/json'
             });

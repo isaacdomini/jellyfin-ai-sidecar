@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field, AliasChoices
 
 
@@ -67,7 +67,7 @@ class SubtitleChunkSchema(BaseModel):
 
 class SearchQuery(BaseModel):
     query: str = Field(..., description="Query string for semantic search")
-    item_id: Optional[str] = Field(None, description="Optional media item ID filter")
+    item_id: Optional[Union[str, List[str]]] = Field(None, description="Optional media item ID(s) to filter")
     top_k: int = Field(default=5, ge=1, le=50, description="Max number of matching chunks to return")
 
 
@@ -88,7 +88,7 @@ class SearchResponse(BaseModel):
 
 class RagQueryRequest(BaseModel):
     query: str = Field(..., description="User query or question to answer using media context")
-    item_id: Optional[str] = Field(None, description="Optional media item ID to restrict the search")
+    item_id: Optional[Union[str, List[str]]] = Field(None, description="Optional media item ID(s) to restrict the search")
     top_k: int = Field(default=15, ge=1, le=50, description="Number of context chunks to retrieve")
     provider: Optional[str] = Field(None, description="LLM provider: 'openai', 'gemini', 'anthropic', 'groq', 'ollama', 'custom', 'mock'")
     api_key: Optional[str] = Field(None, description="API key override for the LLM provider")

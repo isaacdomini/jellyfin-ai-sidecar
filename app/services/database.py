@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import logging
 from sqlalchemy import (
     create_engine,
@@ -122,7 +122,7 @@ def insert_chunks(
 def search_similar_chunks(
     query_embedding: List[float],
     top_k: int = 15,
-    item_id: Optional[str] = None,
+    item_id: Optional[Union[str, List[str]]] = None,
     query_text: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
@@ -131,7 +131,7 @@ def search_similar_chunks(
 
     :param query_embedding: 768-dimensional query vector
     :param top_k: Maximum number of results to return (default: 15)
-    :param item_id: Optional filter for a specific media item
+    :param item_id: Optional filter for a specific media item ID or list of IDs
     :param query_text: Optional raw text query for keyword boosting/filtering
     :return: List of result dictionaries with similarity score and timestamp info
     """
@@ -140,6 +140,14 @@ def search_similar_chunks(
         from sqlalchemy import or_
         seen_ids = set()
         formatted_results = []
+
+        # Resolve filter IDs
+        filter_ids = []
+        if item_id:
+            if isinstance(item_id, list):
+                filter_ids = [str(x).strip() for x in item_id if str(x).strip()]
+            elif isinstance(item_id, str):
+                filter_ids = [x.strip() for x in item_id.split(",") if x.strip()]
 
         # 1. Keyword search boost if specific query phrases/words exist
         if query_text and len(query_text.strip()) > 2:
@@ -152,8 +160,11 @@ def search_similar_chunks(
                 keyword_filters.append(SubtitleChunk.chunk_text.ilike(f"%{w}%"))
 
             kw_stmt = select(SubtitleChunk).where(or_(*keyword_filters))
-            if item_id:
-                kw_stmt = kw_stmt.where(SubtitleChunk.item_id == item_id)
+            if filter_ids:
+                if len(filter_ids) == 1:
+                    kw_stmt = kw_stmt.where(SubtitleChunk.item_id == filter_ids[0])
+                else:
+                    kw_stmt = kw_stmt.where(SubtitleChunk.item_id.in_(filter_ids))
             kw_stmt = kw_stmt.limit(top_k)
             kw_results = session.execute(kw_stmt).scalars().all()
 
@@ -172,8 +183,11 @@ def search_similar_chunks(
         # 2. Semantic vector search
         distance_expr = SubtitleChunk.embedding.cosine_distance(query_embedding).label("distance")
         stmt = select(SubtitleChunk, distance_expr)
-        if item_id:
-            stmt = stmt.where(SubtitleChunk.item_id == item_id)
+        if filter_ids:
+            if len(filter_ids) == 1:
+                stmt = stmt.where(SubtitleChunk.item_id == filter_ids[0])
+            else:
+                stmt = stmt.where(SubtitleChunk.item_id.in_(filter_ids))
 
         stmt = stmt.order_by(distance_expr.asc()).limit(top_k * 2)
         results = session.execute(stmt).all()
