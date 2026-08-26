@@ -399,10 +399,18 @@
                             playBtn.innerHTML = '▶ Play Scene';
 
                             playBtn.addEventListener('click', function () {
-                                // Jump directly to playback at the specified startPositionTicks
+                                // Jump directly to playback at the specified startPositionTicks using modern Jellyfin APIs
                                 if (cit.item_id) {
-                                    var playbackUrl = '#!/playback?itemId=' + cit.item_id + '&startPositionTicks=' + (cit.start_ticks || 0);
-                                    window.location.hash = playbackUrl;
+                                    if (window.playbackManager && typeof window.playbackManager.play === 'function') {
+                                        window.playbackManager.play({
+                                            ids: [cit.item_id],
+                                            startPositionTicks: cit.start_ticks || 0
+                                        });
+                                    } else if (window.appRouter && typeof window.appRouter.showItem === 'function') {
+                                        window.appRouter.showItem(cit.item_id);
+                                    } else {
+                                        window.location.hash = '#/details?id=' + cit.item_id + '&startPositionTicks=' + (cit.start_ticks || 0);
+                                    }
                                 }
                             });
 
