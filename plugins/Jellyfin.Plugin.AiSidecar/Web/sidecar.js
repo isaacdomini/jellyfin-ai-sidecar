@@ -142,11 +142,24 @@
             </div>
             <div class="ai-modal-body">
                 <div id="ai-context-badge" class="ai-context-badge">🎯 Scope: Entire Media Library</div>
-                <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+                <div style="display: flex; gap: 8px; margin-bottom: 12px;">
                     <input type="text" id="ai-query-input" placeholder="Ask about a quote, plot point, or scene..." 
                            style="flex: 1; padding: 10px 14px; border-radius: 6px; border: 1px solid #333; background: #0E1217; color: #fff; outline: none; font-size: 0.95em;">
                     <button id="ai-submit-btn" style="background: #00A4DC; color:#fff; border:none; border-radius:6px; padding: 0 16px; font-weight:600; cursor:pointer;">Ask</button>
                 </div>
+                <details id="ai-advanced-details" style="margin-bottom: 14px; font-size: 0.85em; color: #aaa;">
+                    <summary style="cursor: pointer; user-select: none; color: #00A4DC; font-weight: 500; outline: none;">⚙️ Advanced Options</summary>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 10px 12px; background: #0E1217; border-radius: 6px; border: 1px solid #222;">
+                        <div>
+                            <label for="ai-topk-input" style="color: #ddd; font-weight: 600;">Scenes Retrieved (top_k):</label>
+                            <div style="color: #888; font-size: 0.85em; margin-top: 2px;">Number of 30s dialogue chunks to feed to the AI</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="number" id="ai-topk-input" min="1" max="50" value="20"
+                                   style="width: 60px; padding: 6px 8px; border-radius: 4px; border: 1px solid #444; background: #1a1f26; color: #fff; text-align: center; outline: none; font-weight: bold;">
+                        </div>
+                    </div>
+                </details>
                 <div id="ai-loading" style="display:none; color:#00A4DC; text-align:center; padding:12px; font-size:0.9em;">
                     🔍 Searching subtitles and generating response...
                 </div>
@@ -194,14 +207,22 @@
                     // If viewing a Series or Season, resolve all child episodes for comprehensive scoping
                     if (itemDetails.Type === 'Series' || itemDetails.Type === 'Season') {
                         try {
-                            var epRes = await ApiClient.getItems(userId, {
-                                parentId: itemDetails.Id,
-                                includeItemTypes: 'Episode',
-                                recursive: true,
-                                fields: 'Id'
-                            });
+                            var epRes = null;
+                            if (typeof ApiClient.getEpisodes === 'function' && itemDetails.Type === 'Series') {
+                                epRes = await ApiClient.getEpisodes(itemDetails.Id, { userId: userId, fields: 'Id' });
+                            }
+                            if (!epRes || !epRes.Items || epRes.Items.length === 0) {
+                                epRes = await ApiClient.getItems(userId, {
+                                    parentId: itemDetails.Id,
+                                    seriesId: itemDetails.Id,
+                                    includeItemTypes: 'Episode',
+                                    recursive: true,
+                                    fields: 'Id'
+                                });
+                            }
                             if (epRes && epRes.Items && epRes.Items.length > 0) {
-                                ids = epRes.Items.map(function(e) { return e.Id; });
+                                var epIds = epRes.Items.map(function(e) { return e.Id; });
+                                ids = [itemDetails.Id].concat(epIds);
                             }
                         } catch (epErr) {
                             console.warn("[AI Sidecar] Failed to fetch episodes for series/season:", epErr);
@@ -291,9 +312,25 @@
         currentContext = await getCurrentMediaContext();
         renderContextBadge();
 
+        var savedTopK = localStorage.getItem('ai_sidecar_top_k');
+        var topKInput = document.getElementById('ai-topk-input');
+        if (topKInput && savedTopK) {
+            topKInput.value = savedTopK;
+        }
+
         overlay.style.display = 'flex';
         document.getElementById('ai-query-input').focus();
     };
+
+    var topKInputEl = document.getElementById('ai-topk-input');
+    if (topKInputEl) {
+        topKInputEl.onchange = function () {
+            var val = parseInt(topKInputEl.value, 10);
+            if (val > 0) {
+                localStorage.setItem('ai_sidecar_top_k', val);
+            }
+        };
+    }
 
     // Close Modal
     function closeModal() {
@@ -336,6 +373,16 @@
             }
         }
 
+        var topKVal = 20;
+        var topKInput = document.getElementById('ai-topk-input');
+        if (topKInput) {
+            var parsed = parseInt(topKInput.value, 10);
+            if (parsed > 0) {
+                topKVal = parsed;
+                localStorage.setItem('ai_sidecar_top_k', topKVal);
+            }
+        }
+
         try {
             var response = await ApiClient.fetch({
                 url: ApiClient.getUrl('/Plugins/AiSidecar/Rag'),
@@ -344,8 +391,8 @@
                     query: query,
                     item_id: filterId,
                     itemId: filterId,
-                    top_k: 5,
-                    topK: 5
+                    top_k: topKVal,
+                    topK: topKVal
                 }),
                 contentType: 'application/json'
             });
