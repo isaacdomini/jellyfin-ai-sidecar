@@ -31,6 +31,7 @@ class JellyfinItemEvent(BaseModel):
     ItemName: Optional[str] = Field(default=None, validation_alias=AliasChoices("ItemName", "itemName", "item_name", "Name", "name"))
     ItemType: Optional[str] = Field(default=None, validation_alias=AliasChoices("ItemType", "itemType", "item_type", "Type", "type"))
     ItemPath: Optional[str] = Field(default=None, validation_alias=AliasChoices("ItemPath", "itemPath", "item_path", "Path", "path"))
+    SubtitlePaths: Optional[List[str]] = Field(default=None, validation_alias=AliasChoices("SubtitlePaths", "subtitlePaths", "subtitle_paths"))
     Item: Optional[JellyfinItem] = Field(default=None, validation_alias=AliasChoices("Item", "item"))
     Timestamp: Optional[str] = Field(default=None, validation_alias=AliasChoices("Timestamp", "timestamp"))
 
@@ -48,6 +49,9 @@ class JellyfinItemEvent(BaseModel):
         if self.Item and self.Item.Path:
             return self.Item.Path
         return self.ItemPath
+
+    def get_subtitle_paths(self) -> List[str]:
+        return self.SubtitlePaths or []
 
     def get_overview(self) -> Optional[str]:
         if self.Item and self.Item.Overview:

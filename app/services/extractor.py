@@ -191,15 +191,30 @@ def extract_embedded_stream_to_srt(file_path: str, relative_index: int = 0) -> s
             os.remove(temp_srt_path)
 
 
-def extract_best_single_subtitle(file_path: str) -> Tuple[str, str, bool]:
+def extract_best_single_subtitle(
+    file_path: str,
+    subtitle_paths: Optional[List[str]] = None
+) -> Tuple[str, str, bool]:
     """
     Extracts exactly ONE subtitle track per movie following the user requirements:
     1. Only ONE English subtitle track is used (picking standard full English dialogue, avoiding duplicate tracks).
     2. If no English subtitles exist at all, selects the best available foreign subtitle track so it can be translated.
 
     :param file_path: Path to the media video file or external subtitle file
+    :param subtitle_paths: Optional list of explicit subtitle file paths (e.g. from Jellyfin media streams)
     :return: (srt_content: str, language_code: str, is_english: bool)
     """
+    # 0. Check explicit subtitle paths provided by Jellyfin
+    if subtitle_paths:
+        for sub_p in subtitle_paths:
+            if sub_p and os.path.exists(sub_p) and os.path.getsize(sub_p) > 0:
+                is_eng = is_english_identifier(os.path.basename(sub_p)) or "eng" in sub_p.lower()
+                logger.info(f"Using Jellyfin external subtitle file: {sub_p} (lang='{'eng' if is_eng else 'foreign'}')")
+                if sub_p.lower().endswith(".srt"):
+                    with open(sub_p, "r", encoding="utf-8", errors="ignore") as f:
+                        return f.read(), "eng" if is_eng else "und", is_eng
+                return convert_to_srt(sub_p), "eng" if is_eng else "und", is_eng
+
     if not os.path.exists(file_path):
         logger.error(f"Media file not found: {file_path}")
         return "", "none", False

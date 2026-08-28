@@ -94,6 +94,11 @@ public class LibrarySyncTask : IScheduledTask
 
             try
             {
+                var subPaths = (item as MediaBrowser.Controller.Entities.Video)?.MediaStreams?
+                    .Where(s => s.Type == MediaBrowser.Model.Entities.MediaStreamType.Subtitle && s.IsExternal && !string.IsNullOrEmpty(s.Path))
+                    .Select(s => s.Path)
+                    .ToList() ?? new List<string>();
+
                 var payload = new
                 {
                     Event = "LibrarySync",
@@ -101,6 +106,7 @@ public class LibrarySyncTask : IScheduledTask
                     ItemName = item.Name,
                     ItemType = item.GetType().Name,
                     ItemPath = item.Path,
+                    SubtitlePaths = subPaths,
                     Item = new
                     {
                         Id = item.Id.ToString(),

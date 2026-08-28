@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 import os
 import logging
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
@@ -25,7 +25,8 @@ async def process_media_item_background(
     item_id: str,
     item_name: Optional[str] = None,
     file_path: Optional[str] = None,
-    overview: Optional[str] = None
+    overview: Optional[str] = None,
+    subtitle_paths: Optional[List[str]] = None
 ) -> None:
     """
     Asynchronous background pipeline:
@@ -38,20 +39,22 @@ async def process_media_item_background(
     logger.info(f"Starting background processing for item: id={item_id}, name='{item_name}'")
     chunks = []
 
-    # Attempt subtitle extraction if file exists
-    if file_path and os.path.exists(file_path):
-        try:
-            srt_content, detected_lang, is_english = extract_best_single_subtitle(file_path)
-            if srt_content.strip():
-                raw_chunks = chunk_subtitles(
-                    srt_content,
-                    chunk_size_seconds=settings.CHUNK_SIZE_SECONDS,
-                    overlap_seconds=settings.CHUNK_OVERLAP_SECONDS
-                )
-                chunks = raw_chunks
-                logger.info(f"Ready to index {len(chunks)} chunks for '{item_name}' (lang='{detected_lang}').")
-        except Exception as exc:
-            logger.error(f"Failed to extract or chunk subtitles for item {item_id}: {exc}", exc_info=True)
+    # Attempt subtitle extraction
+    try:
+        srt_content, detected_lang, is_english = extract_best_single_subtitle(
+            file_path=file_path or "",
+            subtitle_paths=subtitle_paths
+        )
+        if srt_content.strip():
+            raw_chunks = chunk_subtitles(
+                srt_content,
+                chunk_size_seconds=settings.CHUNK_SIZE_SECONDS,
+                overlap_seconds=settings.CHUNK_OVERLAP_SECONDS
+            )
+            chunks = raw_chunks
+            logger.info(f"Ready to index {len(chunks)} chunks for '{item_name}' (lang='{detected_lang}').")
+    except Exception as exc:
+        logger.error(f"Failed to extract or chunk subtitles for item {item_id}: {exc}", exc_info=True)
 
     # Include overview plot synopsis chunk if available for plot-level and thematic searches
     if overview and overview.strip():
@@ -101,8 +104,9 @@ async def item_event_webhook(
     item_name = payload.get_item_name() or "Untitled Media"
     file_path = payload.get_file_path()
     overview = payload.get_overview()
+    sub_paths = payload.get_subtitle_paths()
     event_name = payload.Event or payload.NotificationType or "ItemEvent"
-    logger.info(f"Received webhook for media item: event='{event_name}', id='{item_id}', name='{item_name}', path='{file_path}'")
+    logger.info(f"Received webhook for media item: event='{event_name}', id='{item_id}', name='{item_name}', path='{file_path}', sub_paths={len(sub_paths)}")
 
     # Queue extraction, chunking, and vector insertion in the background
     background_tasks.add_task(
@@ -110,7 +114,8 @@ async def item_event_webhook(
         item_id=item_id,
         item_name=item_name,
         file_path=file_path,
-        overview=overview
+        overview=overview,
+        subtitle_paths=sub_paths
     )
 
     return {
