@@ -18,30 +18,35 @@
     var style = document.createElement('style');
     style.id = 'ai-sidecar-styles';
     style.innerHTML = `
-        #ai-fab {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            z-index: 99999;
-            background: linear-gradient(135deg, #00A4DC, #AA5CC3);
-            color: #ffffff;
+        .btnAiSidecar {
+            background: transparent;
             border: none;
-            border-radius: 50px;
-            padding: 10px 18px;
-            font-size: 14px;
-            font-weight: 600;
+            color: inherit;
             cursor: pointer;
-            box-shadow: 0 4px 16px rgba(0, 164, 220, 0.4);
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
-            transition: all 0.25s ease;
-            backdrop-filter: blur(8px);
-            user-select: none;
+            justify-content: center;
+            padding: 0.3em;
+            margin: 0 4px;
+            vertical-align: middle;
+            border-radius: 50%;
+            transition: background-color 0.2s, color 0.2s, transform 0.15s;
+            outline: none;
+            width: 40px;
+            height: 40px;
+            box-sizing: border-box;
         }
-        #ai-fab:hover {
-            transform: translateY(-2px) scale(1.03);
-            box-shadow: 0 6px 22px rgba(170, 92, 195, 0.6);
+        .btnAiSidecar:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #00A4DC;
+            transform: scale(1.08);
+        }
+        .btnAiSidecar svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+            pointer-events: none;
+            display: block;
         }
         #ai-modal-overlay {
             display: none;
@@ -123,13 +128,7 @@
     `;
     document.head.appendChild(style);
 
-    // 2. Inject Floating Action Button
-    var fab = document.createElement('button');
-    fab.id = 'ai-fab';
-    fab.innerHTML = '<span>✨</span><span>Ask AI Scene</span>';
-    document.body.appendChild(fab);
-
-    // 3. Inject Modal Structure
+    // 2. Inject Modal Structure
     var overlay = document.createElement('div');
     overlay.id = 'ai-modal-overlay';
     overlay.innerHTML = `
@@ -308,7 +307,7 @@
     }
 
     // 5. Open Modal & Refresh Context
-    fab.onclick = async function () {
+    async function openAiModal() {
         currentContext = await getCurrentMediaContext();
         renderContextBadge();
 
@@ -319,8 +318,73 @@
         }
 
         overlay.style.display = 'flex';
-        document.getElementById('ai-query-input').focus();
-    };
+        var input = document.getElementById('ai-query-input');
+        if (input) input.focus();
+    }
+
+    function createAiButton() {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'paper-icon-button-light headerButton headerButtonRight btnAiSidecar';
+        btn.setAttribute('title', 'AI Scene & Dialogue Search');
+        btn.setAttribute('aria-label', 'AI Scene & Dialogue Search');
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24">
+                <path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/>
+            </svg>
+        `;
+        btn.onclick = function (e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            openAiModal();
+        };
+        return btn;
+    }
+
+    function attachAiButtons() {
+        // 1. Target Group Play / Cast buttons in Video Player OSD and main headers
+        var controlButtons = document.querySelectorAll(
+            '.btnGroupPlay, .headerGroupPlayButton, .btnCast, .headerCastButton, .videoOsd-btnGroupPlay, .videoOsd-btnCast, [data-action="groupplay"], [data-action="cast"]'
+        );
+
+        controlButtons.forEach(function (btn) {
+            var parent = btn.parentElement;
+            if (parent && !parent.querySelector('.btnAiSidecar')) {
+                var aiBtn = createAiButton();
+                if (btn.nextSibling) {
+                    parent.insertBefore(aiBtn, btn.nextSibling);
+                } else {
+                    parent.appendChild(aiBtn);
+                }
+            }
+        });
+
+        // 2. Target header button containers (e.g. videoOsdHeader, skinHeader-right)
+        var containers = document.querySelectorAll(
+            '.videoOsdHeader .headerRight, .osdHeader .headerRight, .headerRight, .skinHeader-right, .mainHeader .headerRight, .videoOsdBottom-buttons'
+        );
+
+        containers.forEach(function (container) {
+            if (!container.querySelector('.btnAiSidecar')) {
+                var aiBtn = createAiButton();
+                if (container.firstChild) {
+                    container.insertBefore(aiBtn, container.firstChild);
+                } else {
+                    container.appendChild(aiBtn);
+                }
+            }
+        });
+    }
+
+    // Attach buttons and watch for DOM updates / OSD appearances
+    attachAiButtons();
+    var domObserver = new MutationObserver(function () {
+        attachAiButtons();
+    });
+    domObserver.observe(document.body, { childList: true, subtree: true });
+    setInterval(attachAiButtons, 1000);
 
     var topKInputEl = document.getElementById('ai-topk-input');
     if (topKInputEl) {
